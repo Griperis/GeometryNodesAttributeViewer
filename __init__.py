@@ -97,6 +97,17 @@ def find_attribute_viewer_nodes(
     return ret
 
 
+def find_first_attribute_viewer(
+    node_tree: bpy.types.NodeTree
+) -> typing.Optional[bpy.types.GeometryNodeGroup]:
+    for node in node_tree.nodes:
+        if not isinstance(node, bpy.types.GeometryNodeGroup):
+            continue
+
+        if node.node_tree.name.startswith(tuple(SOCKETS_NODE_NAME_MAP.values())):
+            return node
+    
+    return None
 def get_attribute_viewer(
     node_tree: bpy.types.NodeTree,
     socket: bpy.types.NodeSocket,
@@ -116,6 +127,20 @@ def get_attribute_viewer(
         node_group = attribute_viewers[0]
 
     return is_new, node_group
+
+
+def get_first_geometry_output(
+    node: bpy.types.Node
+) -> typing.Optional[bpy.types.NodeSocketGeometry]:
+    for socket in node.outputs:
+        if isinstance(socket, bpy.types.NodeSocketGeometry):
+            return socket
+    
+    return None
+
+
+class Preferences(bpy.types.AddonPreferences):
+    bl_idname = __package__
 
 
 class AV_ViewAttribute(bpy.types.Operator):
@@ -141,28 +166,91 @@ class AV_ViewAttribute(bpy.types.Operator):
                 if is_socket_connected_to_viewer(node_tree, socket_to_view):
                     viewer_connected_idx = i
                     break
-
-            idx = viewer_connected_idx + 1
-            # No applicable socket to connect to
-            if idx >= len(viewable_sockets):
-                idx = 0
-
-            # Disconnect other sockets going to viewer and connect this one
-            for link in list(node_tree.links):
-                if link.from_socket in viewable_sockets:
-                    node_tree.links.remove(link)
-
-            socket_to_view = viewable_sockets[idx]
-            is_new, attribute_viewer = get_attribute_viewer(node_tree, socket_to_view)
-            node_tree.links.new(socket_to_view, attribute_viewer.inputs[1])
-
-            # adjust attribute viewer location
-            if is_new:
-                attribute_viewer.location = (active_node.location.x + 400, active_node.location.y) 
             
+            attribute_viewer = None
+            if len(viewable_sockets) > 0:
+                idx = viewer_connected_idx + 1
+                if idx == len(viewable_sockets):
+                    idx = 0
+
+                # Disconnect other sockets going to viewer and connect this one
+                for link in list(node_tree.links):
+                    if link.from_socket in viewable_sockets:
+                        node_tree.links.remove(link)
+
+                socket_to_view = viewable_sockets[idx]
+                is_new, attribute_viewer = get_attribute_viewer(node_tree, socket_to_view)
+                node_tree.links.new(socket_to_view, attribute_viewer.inputs[1])
+
+                # adjust attribute viewer location
+                if is_new:
+                    attribute_viewer.location = (active_node.location.x + 400, active_node.location.y) 
+                
+            geometry_socket = get_first_geometry_output(active_node)
+            # Attribute viewer is connected to socket, but also has geometry socket that
+            # could be connected and isn't
+            if geometry_socket is not None:
+                # Selected node doesn't have any valid sockets to preview, but we can still
+                # switch the geometry input of the attribute viewer if there is any present
+                if attribute_viewer is None:
+                    attribute_viewer = find_first_attribute_viewer(node_tree)
+                
+                if attribute_viewer is not None:
+                    node_tree.links.new(geometry_socket, attribute_viewer.inputs[0])
+
+            
+            # Connect attribute viewer to output
+            if attribute_viewer is not None:
+                output_node = None
+                for node in node_tree.nodes:
+                    if not isinstance(node, bpy.types.NodeGroupOutput):
+                        continue
+
+                    output_node = node
+                    break
+                
+
+                if output_node is not None:
+                    output_geo_socket = None
+                    for socket in output_node.inputs:
+                        if not isinstance(socket, bpy.types.NodeSocketGeometry):
+                            continue
+                        
+                        output_geo_socket = socket
+                        break
+                    
+                    join_geo_node = None
+                    for link in node_tree.links:
+                        if not isinstance(link.from_node, bpy.types.GeometryNodeJoinGeometry):
+                            continue
+
+                        if link.to_socket == output_geo_socket:
+                            join_geo_node = link.from_node
+                            break
+                    
+                    if join_geo_node is None:
+                        join_geo_node = node_tree.nodes.new('GeometryNodeJoinGeometry')
+                        join_geo_node.location = (output_node.location.x - 300, output_node.location.y) 
+                    
+                        for link in list(node_tree.links):
+                            if link.to_socket == output_geo_socket:
+                                node_tree.links.new(join_geo_node.inputs[0], link.from_socket)
+
+                    found_link = None
+                    for link in list(node_tree.links):
+                        if link.to_node == join_geo_node and link.from_node == attribute_viewer:
+                            found_link = link
+                            break 
+                    
+                    if found_link is None:
+                        node_tree.links.new(join_geo_node.inputs[0], attribute_viewer.outputs[0])
+                    
+                    node_tree.links.new(join_geo_node.outputs[0], output_geo_socket)
+
             # TODO: 
             # - Auto-connect geometry input? (how to figure that out)
             # - - if has geometry output, use that one
+            # - - if selected node has only geometry socket, reconnect only that one
             # - Auto-connect geometry output with join geometry of the group output
         
         return {'FINISHED'}
@@ -199,15 +287,27 @@ class AV_RemoveViewer(bpy.types.Operator):
 
 
         return {'FINISHED'}
-            
+
+
+class AV_QuickView(bpy.types.Operator):
+    bl_idname = "attribute_viewer.quick_view"
+    # shown in context menu, alows easy view of UV_Map, VertexColor, ...
+    # when clicked geometry node group is going to be spawned on the mesh
+    # and connected with the correct attributes, ...
+    # Use cases:
+    # - vertex crease
+    # - vertex color
+    # - vertex position
+    # - 
             
 
 KEYMAP_DEFINITIONS = (
-    (AV_ViewAttribute.bl_idname, 'MIDDLEMOUSE', 'PRESS', True, True, False),
+    (AV_ViewAttribute.bl_idname, 'LEFTMOUSE', 'PRESS', True, True, False),
     (AV_RemoveViewer.bl_idname, 'RIGHTMOUSE', 'PRESS', True, True, False),
 )
 
 CLASSES = [
+    Preferences,
     AV_ViewAttribute,
     AV_RemoveViewer
 ]
