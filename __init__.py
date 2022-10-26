@@ -30,6 +30,8 @@ SOCKETS_NODE_NAME_MAP = {
     # bpy.types.NodeSocketColor: "AV_ColorAttributeViewer",
 }
 
+GLOBAL_SCALE_FACTOR = 0.1
+
 def get_geonodes_path() -> str:
     return os.path.abspath(GEONODES_PATH)
 
@@ -137,6 +139,12 @@ def get_first_geometry_output(
             return socket
     
     return None
+
+
+def adjust_viewer_text_size(obj: bpy.types.Object, viewer: bpy.types.GeometryNodeGroup):
+    text_size = max(obj.dimensions) * GLOBAL_SCALE_FACTOR
+    input: bpy.types.NodeSocketFloat = viewer.inputs.get("Scale")
+    input.default_value = text_size
 
 
 class Preferences(bpy.types.AddonPreferences):
@@ -247,6 +255,8 @@ class AV_ViewAttribute(bpy.types.Operator):
                     
                     node_tree.links.new(join_geo_node.outputs[0], output_geo_socket)
 
+            if attribute_viewer is not None and context.active_object is not None:
+                adjust_viewer_text_size(context.active_object, attribute_viewer)
             # TODO: 
             # - Auto-connect geometry input? (how to figure that out)
             # - - if has geometry output, use that one
