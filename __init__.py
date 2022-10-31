@@ -151,14 +151,16 @@ class Preferences(bpy.types.AddonPreferences):
     bl_idname = __package__
 
 
-class AV_ViewAttribute(bpy.types.Operator):
-    bl_idname = "attribute_viewer.view"
-    bl_label = "View Attribute"
-
+class GeoNodesEditorOperator:
     @classmethod
     def poll(cls, context: bpy.types.Context) -> bool:
         return context.space_data.type == 'NODE_EDITOR' and \
             context.space_data.node_tree.type == 'GEOMETRY'
+
+
+class AV_ViewAttribute(GeoNodesEditorOperator, bpy.types.Operator):
+    bl_idname = "attribute_viewer.view"
+    bl_label = "View Attribute"
 
     def invoke(self, context: bpy.types.Context, event: bpy.types.Event):
         space: bpy.types.SpaceNodeEditor = context.space_data
@@ -266,7 +268,7 @@ class AV_ViewAttribute(bpy.types.Operator):
         return {'FINISHED'}
 
 
-class AV_RemoveViewer(bpy.types.Operator):
+class AV_RemoveViewer(GeoNodesEditorOperator, bpy.types.Operator):
     bl_idname = "attribute_viewer.remove_viewer"
     bl_label = "View Attribute"
 
@@ -299,7 +301,24 @@ class AV_RemoveViewer(bpy.types.Operator):
         return {'FINISHED'}
 
 
-class AV_QuickView(bpy.types.Operator):
+
+class AV_RemoveAllViewers(GeoNodesEditorOperator, bpy.types.Operator):
+    bl_idname = "attribute_viewer.remove_viewers"
+    bl_label = "Remove All Viewers"
+    bl_description = "Finds all viewers in active node_tree and removes them, doesn't preserve "
+    "connections"
+
+    def execute(self, context: bpy.types.Context):
+        space: bpy.types.SpaceNodeEditor = context.space_data
+        node_tree = space.node_tree
+        for node in list(node_tree.nodes):
+            if is_viewer_node(node):
+                node_tree.nodes.remove(node)
+
+        return {'FINISHED'}
+
+
+class AV_QuickView(GeoNodesEditorOperator, bpy.types.Operator):
     bl_idname = "attribute_viewer.quick_view"
     # shown in context menu, alows easy view of UV_Map, VertexColor, ...
     # when clicked geometry node group is going to be spawned on the mesh
@@ -311,6 +330,7 @@ class AV_QuickView(bpy.types.Operator):
     # - 
             
 
+# TODO: Change keymaps to not interfere with node wrangler :)
 KEYMAP_DEFINITIONS = (
     (AV_ViewAttribute.bl_idname, 'LEFTMOUSE', 'PRESS', True, True, False),
     (AV_RemoveViewer.bl_idname, 'RIGHTMOUSE', 'PRESS', True, True, False),
@@ -319,7 +339,8 @@ KEYMAP_DEFINITIONS = (
 CLASSES = [
     Preferences,
     AV_ViewAttribute,
-    AV_RemoveViewer
+    AV_RemoveViewer,
+    AV_RemoveAllViewers
 ]
 
 REGISTERED_KEYMAPS = []
