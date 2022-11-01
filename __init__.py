@@ -40,7 +40,7 @@ def ensure_viewer_nodes_loaded(link: bool = True):
     with bpy.data.libraries.load(get_geonodes_path(), link=link) as (data_from, data_to):
         for node_group_name in SOCKETS_NODE_NAME_MAP.values():
             if node_group_name in bpy.data.node_groups:
-                # if linked and from library, then refresh
+                # TODO: if linked and from library, then refresh
                 # if not linked, then link and use the linked one to
                 ...
             else:
@@ -110,6 +110,15 @@ def find_first_attribute_viewer(
             return node
     
     return None
+
+
+def new_node_group(node_tree: bpy.types.NodeTree, name: str) -> bpy.types.NodeCustomGroup:
+    node = node_tree.nodes.new(type='GeometryNodeGroup')
+    node_tree: bpy.types.GeometryNodeGroup = bpy.data.node_groups.get(name)
+    node.node_tree = node_tree
+    return node
+
+
 def get_attribute_viewer(
     node_tree: bpy.types.NodeTree,
     socket: bpy.types.NodeSocket,
@@ -120,15 +129,19 @@ def get_attribute_viewer(
     is_new = False
     attribute_viewers = find_attribute_viewer_nodes(node_tree, socket)
     if not reuse_nodes or len(attribute_viewers) == 0:
-        node_group = node_tree.nodes.new(type='GeometryNodeGroup')
-        attribute_viewer: bpy.types.GeometryNodeGroup = bpy.data.node_groups.get(
-            SOCKETS_NODE_NAME_MAP[type(socket)]) 
-        node_group.node_tree = attribute_viewer
+        node_group = new_node_group(node_tree, SOCKETS_NODE_NAME_MAP[type(socket)])
         is_new = True
     else:
         node_group = attribute_viewers[0]
 
     return is_new, node_group
+
+
+def new_attribute_viewer(
+    node_tree: bpy.types.NodeTree,
+    socket_type: typing.Type[bpy.types.NodeSocket]
+) -> bpy.types.GeometryNodeGroup:
+    return new_node_group(node_tree, SOCKETS_NODE_NAME_MAP[socket_type])
 
 
 def get_first_geometry_output(
@@ -151,14 +164,14 @@ class Preferences(bpy.types.AddonPreferences):
     bl_idname = __package__
 
 
-class GeoNodesEditorOperator:
+class GeoNodesEditorPoll:
     @classmethod
     def poll(cls, context: bpy.types.Context) -> bool:
         return context.space_data.type == 'NODE_EDITOR' and \
             context.space_data.node_tree.type == 'GEOMETRY'
 
 
-class AV_ViewAttribute(GeoNodesEditorOperator, bpy.types.Operator):
+class AV_ViewAttribute(GeoNodesEditorPoll, bpy.types.Operator):
     bl_idname = "attribute_viewer.view"
     bl_label = "View Attribute"
 
@@ -268,9 +281,9 @@ class AV_ViewAttribute(GeoNodesEditorOperator, bpy.types.Operator):
         return {'FINISHED'}
 
 
-class AV_RemoveViewer(GeoNodesEditorOperator, bpy.types.Operator):
+class AV_RemoveViewer(GeoNodesEditorPoll, bpy.types.Operator):
     bl_idname = "attribute_viewer.remove_viewer"
-    bl_label = "View Attribute"
+    bl_label = "Remove Attribute Viewer"
 
     @classmethod
     def poll(cls, context: bpy.types.Context) -> bool:
@@ -297,12 +310,52 @@ class AV_RemoveViewer(GeoNodesEditorOperator, bpy.types.Operator):
             for node in nodes_to_remove:
                 node_tree.nodes.remove(node)
 
+        return {'FINISHED'}
 
+
+class AV_AddViewer(GeoNodesEditorPoll, bpy.types.Operator):
+    bl_idname = "attribute_viewer.add_viewer"
+    bl_label = "Add Viewer"
+    bl_description = "Adds viewer node group of your choice into active node tree"
+
+    viewer_type: bpy.props.EnumProperty(
+        name="Viewer Type",
+        items=lambda _, __: AV_AddViewer.get_viewer_enum_items()
+    )
+
+    @staticmethod
+    def get_viewer_enum_items() -> typing.Iterable[typing.Tuple[str, str, str]]:
+        enum_items = []
+        for key, value in SOCKETS_NODE_NAME_MAP.items():
+            readable_value = value[len("AV_"):-len("AttributeViewer")]
+            enum_items.append((str(key), readable_value, readable_value))
+
+        return enum_items
+
+    @staticmethod
+    def get_socket_type_from_enum_item(item: str) -> bpy.types.NodeSocket:
+        for socket, _ in SOCKETS_NODE_NAME_MAP.items():
+            if str(socket) == item:
+                return socket
+
+    def draw(self, context: bpy.types.Context) -> None:
+        layout = self.layout
+        layout.prop(self, "viewer_type")
+
+    def invoke(self, context: bpy.types.Context, event: bpy.types.Event):
+        self.mouse_position = (event.mouse_x, event.mouse_y)
+        return context.window_manager.invoke_props_dialog(self)
+
+    def execute(self, context: bpy.types.Context):
+        space: bpy.types.SpaceNodeEditor = context.space_data
+        node_tree = space.node_tree
+        selected_socket_type = AV_AddViewer.get_socket_type_from_enum_item(self.viewer_type)
+        viewer = new_attribute_viewer(node_tree, selected_socket_type) 
         return {'FINISHED'}
 
 
 
-class AV_RemoveAllViewers(GeoNodesEditorOperator, bpy.types.Operator):
+class AV_RemoveAllViewers(GeoNodesEditorPoll, bpy.types.Operator):
     bl_idname = "attribute_viewer.remove_viewers"
     bl_label = "Remove All Viewers"
     bl_description = "Finds all viewers in active node_tree and removes them, doesn't preserve "
@@ -317,8 +370,11 @@ class AV_RemoveAllViewers(GeoNodesEditorOperator, bpy.types.Operator):
 
         return {'FINISHED'}
 
+    def invoke(self, context: bpy.types.Context, event: bpy.types.Event):
+        return context.window_manager.invoke_confirm(self, event)
 
-class AV_QuickView(GeoNodesEditorOperator, bpy.types.Operator):
+
+class AV_QuickView(GeoNodesEditorPoll, bpy.types.Operator):
     bl_idname = "attribute_viewer.quick_view"
     # shown in context menu, alows easy view of UV_Map, VertexColor, ...
     # when clicked geometry node group is going to be spawned on the mesh
@@ -327,20 +383,34 @@ class AV_QuickView(GeoNodesEditorOperator, bpy.types.Operator):
     # - vertex crease
     # - vertex color
     # - vertex position
-    # - 
-            
+
+
+class AV_Panel(GeoNodesEditorPoll, bpy.types.Panel):
+    bl_idname = "NODE_PT_attribute_visualiser"
+    bl_label = "Attribute Visualiser"
+    bl_space_type = 'NODE_EDITOR'
+    bl_region_type = 'UI'
+    bl_category = "Attribute Visualiser"
+
+    def draw(self, context: bpy.types.Context):
+        layout = self.layout
+        layout.operator(AV_AddViewer.bl_idname)
+        layout.operator(AV_RemoveAllViewers.bl_idname)
+
 
 # TODO: Change keymaps to not interfere with node wrangler :)
 KEYMAP_DEFINITIONS = (
-    (AV_ViewAttribute.bl_idname, 'LEFTMOUSE', 'PRESS', True, True, False),
+    (AV_ViewAttribute.bl_idname, 'MIDDLEMOUSE', 'PRESS', True, True, False),
     (AV_RemoveViewer.bl_idname, 'RIGHTMOUSE', 'PRESS', True, True, False),
 )
 
 CLASSES = [
     Preferences,
     AV_ViewAttribute,
+    AV_AddViewer,
     AV_RemoveViewer,
-    AV_RemoveAllViewers
+    AV_RemoveAllViewers,
+    AV_Panel
 ]
 
 REGISTERED_KEYMAPS = []
