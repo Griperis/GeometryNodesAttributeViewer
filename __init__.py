@@ -198,7 +198,7 @@ class AV_ViewAttribute(GeoNodesEditorOnlyMixin, bpy.types.Operator):
             if is_viewer_node(active_node):
                 self.report({'WARNING'}, "Can't view attribute from itself!")
                 return {'FINISHED'}
-                
+
             ensure_viewer_nodes_loaded()
             # Connect active socket if any, or list through the sockets on click
             viewable_sockets = list(filter_applicable_sockets(active_node.outputs))
@@ -381,7 +381,6 @@ class AV_AddViewer(GeoNodesEditorOnlyMixin, bpy.types.Operator):
         return bpy.ops.node.translate_attach_remove_on_cancel('INVOKE_DEFAULT')
 
 
-
 class AV_RemoveAllViewers(GeoNodesEditorOnlyMixin, bpy.types.Operator):
     bl_idname = "attribute_viewer.remove_viewers"
     bl_label = "Remove All Viewers"
@@ -411,6 +410,7 @@ class AV_QuickView(GeoNodesEditorOnlyMixin, bpy.types.Operator):
     # - vertex color
     # - vertex position
 
+
 class AV_AttributeMenu(GeoNodesEditorOnlyMixin, bpy.types.Menu):
     bl_idname = "NODE_MT_attribute_viewer_attribute_menu"
     bl_label = "Add Viewer"
@@ -432,6 +432,7 @@ class AV_MainMenu(GeoNodesEditorOnlyMixin, bpy.types.Menu):
         layout.separator()
         layout.operator(AV_RemoveAllViewers.bl_idname, icon='PANEL_CLOSE')
 
+
 class AV_Panel(GeoNodesEditorOnlyMixin, bpy.types.Panel):
     bl_idname = "NODE_PT_attribute_viewer"
     bl_label = "Attribute Viewer"
@@ -441,6 +442,7 @@ class AV_Panel(GeoNodesEditorOnlyMixin, bpy.types.Panel):
 
     def draw(self, context: bpy.types.Context):
         AV_MainMenu.draw(self, context)
+
 
 # TODO: Change keymaps to not interfere with node wrangler :)
 KEYMAP_DEFINITIONS = (
