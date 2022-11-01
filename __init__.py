@@ -19,6 +19,7 @@ bl_info = {
 }
 
 import bpy
+import math
 import typing
 import os
 
@@ -157,8 +158,22 @@ def get_first_geometry_output(
     return None
 
 
-def adjust_viewer_text_size(obj: bpy.types.Object, viewer: bpy.types.GeometryNodeGroup):
-    text_size = max(obj.dimensions) * GLOBAL_SCALE_FACTOR
+def safe_get_active_object(context: bpy.types.Context) -> typing.Optional[bpy.types.Object]:
+    if not hasattr(context, "active_object"):
+        return None
+    
+    return context.active_object
+
+
+def adjust_viewer_text_size(
+    obj: typing.Optional[bpy.types.Object],
+    viewer: bpy.types.GeometryNodeGroup
+):
+    size_factor = max(obj.dimensions)
+    if obj is None or math.isclose(size_factor, 0.0) or size_factor < 0:
+        size_factor = 1.0
+
+    text_size = size_factor * GLOBAL_SCALE_FACTOR
     input: bpy.types.NodeSocketFloat = viewer.inputs.get("Scale")
     input.default_value = text_size
 
@@ -289,7 +304,10 @@ class AV_ViewAttribute(GeoNodesEditorOnlyMixin, bpy.types.Operator):
                     node_tree.links.new(join_geo_node.outputs[0], output_geo_socket)
 
             if attribute_viewer is not None and context.active_object is not None:
-                adjust_viewer_text_size(context.active_object, attribute_viewer)
+                adjust_viewer_text_size(
+                    safe_get_active_object(context),
+                    attribute_viewer
+                )
             # TODO: 
             # - Auto-connect geometry input? (how to figure that out)
             # - - if has geometry output, use that one
@@ -372,6 +390,10 @@ class AV_AddViewer(GeoNodesEditorOnlyMixin, bpy.types.Operator):
         selected_socket_type = AV_AddViewer.get_socket_type_from_enum_item(self.viewer_type)
         viewer = new_attribute_viewer(node_tree, selected_socket_type) 
         viewer.location = self.mouse_position
+        adjust_viewer_text_size(
+            safe_get_active_object(context),
+            viewer
+        )
 
         # Deselect all nodes in order to not move them with following operator
         for node in node_tree.nodes:
