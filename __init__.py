@@ -247,31 +247,35 @@ class Preferences(bpy.types.AddonPreferences):
         default=True
     )
 
+    collapse_default_settings: bpy.props.BoolProperty()
+
     def draw(self, context: bpy.types.Context) -> None:
         layout: bpy.types.UILayout = self.layout
-        row = layout.row()
-        row.label(text="Default Settings (for newly spawned viewers)")
-
-        col = layout.column()
-        row = col.row()
-        row.enabled = False
-        row.label(text="Numbers")
-        col.prop(self, "digits")
-        col.prop(self, "decimals")
-        col.prop(self, "base")
-        col.separator()
-        
-        row = col.row()
-        row.enabled = False
-        row.label(text="Appearance") 
-        col.prop(self, "scale")
-        col.prop(self, "color")
-        col.separator()
-        col.prop(self, "offset_along_normals")
-        col.prop(self, "offset")
-        col.separator()
-        col.prop(self, "viewport_only")
-        col.prop(self, "show_geometry")
+        row = layout.row(align=True)
+        icon = 'TRIA_RIGHT' if self.collapse_default_settings else 'TRIA_DOWN'
+        row.prop(self, "collapse_default_settings", icon_only=True, icon=icon, emboss=False)
+        row.label(text="Default Viewer Settings (for newly spawned viewers)")
+        if not self.collapse_default_settings:
+            col = layout.column()
+            row = col.row()
+            row.enabled = False
+            row.label(text="Numbers")
+            col.prop(self, "digits")
+            col.prop(self, "decimals")
+            col.prop(self, "base")
+            col.separator()
+            
+            row = col.row()
+            row.enabled = False
+            row.label(text="Appearance") 
+            col.prop(self, "scale")
+            col.prop(self, "color")
+            col.separator()
+            col.prop(self, "offset_along_normals")
+            col.prop(self, "offset")
+            col.separator()
+            col.prop(self, "viewport_only")
+            col.prop(self, "show_geometry")
 
     def apply_defaults(self, node: bpy.types.GeometryNodeGroup) -> None:
         for prop_name in self.__annotations__:
