@@ -123,6 +123,15 @@ def new_node_group(node_tree: bpy.types.NodeTree, name: str) -> bpy.types.NodeCu
     return node
 
 
+def new_attribute_viewer(
+    node_tree: bpy.types.NodeTree,
+    socket_type: typing.Type[bpy.types.NodeSocket]
+) -> bpy.types.GeometryNodeGroup:
+    node = new_node_group(node_tree, SOCKETS_NODE_NAME_MAP[socket_type])
+    get_preferences().apply_defaults(node)
+    return node
+
+
 def get_attribute_viewer(
     node_tree: bpy.types.NodeTree,
     socket: bpy.types.NodeSocket,
@@ -133,19 +142,12 @@ def get_attribute_viewer(
     is_new = False
     attribute_viewers = find_attribute_viewer_nodes(node_tree, socket)
     if not reuse_nodes or len(attribute_viewers) == 0:
-        node_group = new_node_group(node_tree, SOCKETS_NODE_NAME_MAP[type(socket)])
+        node_group = new_attribute_viewer(node_tree, type(socket)) 
         is_new = True
     else:
         node_group = attribute_viewers[0]
 
     return is_new, node_group
-
-
-def new_attribute_viewer(
-    node_tree: bpy.types.NodeTree,
-    socket_type: typing.Type[bpy.types.NodeSocket]
-) -> bpy.types.GeometryNodeGroup:
-    return new_node_group(node_tree, SOCKETS_NODE_NAME_MAP[socket_type])
 
 
 def get_first_geometry_output(
@@ -191,7 +193,100 @@ def mouse_to_region_coords(
 
 class Preferences(bpy.types.AddonPreferences):
     bl_idname = __package__
+    
+    digits: bpy.props.IntProperty(
+        name="Digits",
+        default=6,
+        min=0
+    )
+    decimals: bpy.props.IntProperty(
+        name="Decimals",
+        default=1,
+        min=0,
+    )
 
+    base: bpy.props.FloatProperty(
+        name="Base (2, 10, 16)",
+        description="Use different base (upto 16 are supported). Convert to PI-base if you want :)",
+        default=10,
+        min=2,
+        max=16
+    )
+
+    scale: bpy.props.FloatProperty(
+        name="Text Scale",
+        default=1,
+        min=0
+    )
+
+    color: bpy.props.FloatVectorProperty(
+        name="Color",
+        subtype='COLOR',
+        size=4,
+        default=(0.799103, 0.337164, 0.006995, 1.0)
+    )
+
+    offset_along_normals: bpy.props.BoolProperty(
+        name="Offset Along Normals",
+        default=False,
+    )
+    offset: bpy.props.FloatVectorProperty(
+        name="Offset",
+        size=3,
+        default=(0.0, 0.0, 0.0)
+    )
+
+    viewport_only: bpy.props.BoolProperty(
+        name="Viewport Only",
+        description="If toggled, then viewer geometry is shown only in viewport",
+        default=True
+    )
+    show_geometry: bpy.props.BoolProperty(
+        name="Show Original Geometry",
+        description="If toggled, original geometry is output with the added geometry",
+        default=True
+    )
+
+    def draw(self, context: bpy.types.Context) -> None:
+        layout: bpy.types.UILayout = self.layout
+        row = layout.row()
+        row.label(text="Default Settings (for newly spawned viewers)")
+
+        col = layout.column()
+        row = col.row()
+        row.enabled = False
+        row.label(text="Numbers")
+        col.prop(self, "digits")
+        col.prop(self, "decimals")
+        col.prop(self, "base")
+        col.separator()
+        
+        row = col.row()
+        row.enabled = False
+        row.label(text="Appearance") 
+        col.prop(self, "scale")
+        col.prop(self, "color")
+        col.separator()
+        col.prop(self, "offset_along_normals")
+        col.prop(self, "offset")
+        col.separator()
+        col.prop(self, "viewport_only")
+        col.prop(self, "show_geometry")
+
+    def apply_defaults(self, node: bpy.types.GeometryNodeGroup) -> None:
+        for prop_name in self.__annotations__:
+            for input_ in node.inputs:
+                if prop_name == input_.name.lower():
+                    input_.default_value = getattr(self, prop_name)
+                    break 
+
+
+def get_preferences(context: typing.Optional[bpy.types.Context] = None) -> Preferences:
+    if context is None:
+        context = bpy.context
+
+    return context.preferences.addons[__package__].preferences
+    
 
 class GeoNodesEditorOnlyMixin:
     @classmethod
