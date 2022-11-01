@@ -164,14 +164,14 @@ class Preferences(bpy.types.AddonPreferences):
     bl_idname = __package__
 
 
-class GeoNodesEditorPoll:
+class GeoNodesEditorOnlyMixin:
     @classmethod
     def poll(cls, context: bpy.types.Context) -> bool:
         return context.space_data.type == 'NODE_EDITOR' and \
             context.space_data.node_tree.type == 'GEOMETRY'
 
 
-class AV_ViewAttribute(GeoNodesEditorPoll, bpy.types.Operator):
+class AV_ViewAttribute(GeoNodesEditorOnlyMixin, bpy.types.Operator):
     bl_idname = "attribute_viewer.view"
     bl_label = "View Attribute"
 
@@ -281,7 +281,7 @@ class AV_ViewAttribute(GeoNodesEditorPoll, bpy.types.Operator):
         return {'FINISHED'}
 
 
-class AV_RemoveViewer(GeoNodesEditorPoll, bpy.types.Operator):
+class AV_RemoveViewer(GeoNodesEditorOnlyMixin, bpy.types.Operator):
     bl_idname = "attribute_viewer.remove_viewer"
     bl_label = "Remove Attribute Viewer"
 
@@ -313,30 +313,33 @@ class AV_RemoveViewer(GeoNodesEditorPoll, bpy.types.Operator):
         return {'FINISHED'}
 
 
-class AV_AddViewer(GeoNodesEditorPoll, bpy.types.Operator):
+class AV_AddViewer(GeoNodesEditorOnlyMixin, bpy.types.Operator):
     bl_idname = "attribute_viewer.add_viewer"
     bl_label = "Add Viewer"
     bl_description = "Adds viewer node group of your choice into active node tree"
 
     viewer_type: bpy.props.EnumProperty(
         name="Viewer Type",
-        items=lambda _, __: AV_AddViewer.get_viewer_enum_items()
+        items=lambda _, __: AV_AddViewer.get_viewer_enum_items(),
     )
+
+    use_popup: bpy.props.BoolProperty(options={'HIDDEN'})
 
     @staticmethod
     def get_viewer_enum_items() -> typing.Iterable[typing.Tuple[str, str, str]]:
         enum_items = []
-        for key, value in SOCKETS_NODE_NAME_MAP.items():
-            readable_value = value[len("AV_"):-len("AttributeViewer")]
-            enum_items.append((str(key), readable_value, readable_value))
+        for _, value in SOCKETS_NODE_NAME_MAP.items():
+            type_ = value[len("AV_"):-len("AttributeViewer")]
+            enum_items.append((type_.upper(), type_, type_))
 
         return enum_items
 
     @staticmethod
     def get_socket_type_from_enum_item(item: str) -> bpy.types.NodeSocket:
-        for socket, _ in SOCKETS_NODE_NAME_MAP.items():
-            if str(socket) == item:
-                return socket
+        for socket_type, viewer_name in SOCKETS_NODE_NAME_MAP.items():
+            # 'float' in 'av_floatattributeviewer'
+            if item.lower() in viewer_name.lower():
+                return socket_type
 
     def draw(self, context: bpy.types.Context) -> None:
         layout = self.layout
@@ -344,18 +347,22 @@ class AV_AddViewer(GeoNodesEditorPoll, bpy.types.Operator):
 
     def invoke(self, context: bpy.types.Context, event: bpy.types.Event):
         self.mouse_position = (event.mouse_x, event.mouse_y)
-        return context.window_manager.invoke_props_dialog(self)
+        if self.use_popup:
+            return context.window_manager.invoke_props_dialog(self)
+        else:
+            return self.execute(context)
 
     def execute(self, context: bpy.types.Context):
         space: bpy.types.SpaceNodeEditor = context.space_data
         node_tree = space.node_tree
+        ensure_viewer_nodes_loaded()
         selected_socket_type = AV_AddViewer.get_socket_type_from_enum_item(self.viewer_type)
-        viewer = new_attribute_viewer(node_tree, selected_socket_type) 
+        new_attribute_viewer(node_tree, selected_socket_type) 
         return {'FINISHED'}
 
 
 
-class AV_RemoveAllViewers(GeoNodesEditorPoll, bpy.types.Operator):
+class AV_RemoveAllViewers(GeoNodesEditorOnlyMixin, bpy.types.Operator):
     bl_idname = "attribute_viewer.remove_viewers"
     bl_label = "Remove All Viewers"
     bl_description = "Finds all viewers in active node_tree and removes them, doesn't preserve "
@@ -374,7 +381,7 @@ class AV_RemoveAllViewers(GeoNodesEditorPoll, bpy.types.Operator):
         return context.window_manager.invoke_confirm(self, event)
 
 
-class AV_QuickView(GeoNodesEditorPoll, bpy.types.Operator):
+class AV_QuickView(GeoNodesEditorOnlyMixin, bpy.types.Operator):
     bl_idname = "attribute_viewer.quick_view"
     # shown in context menu, alows easy view of UV_Map, VertexColor, ...
     # when clicked geometry node group is going to be spawned on the mesh
@@ -385,32 +392,59 @@ class AV_QuickView(GeoNodesEditorPoll, bpy.types.Operator):
     # - vertex position
 
 
-class AV_Panel(GeoNodesEditorPoll, bpy.types.Panel):
-    bl_idname = "NODE_PT_attribute_visualiser"
-    bl_label = "Attribute Visualiser"
+class AV_Panel(GeoNodesEditorOnlyMixin, bpy.types.Panel):
+    bl_idname = "NODE_PT_attribute_viewer"
+    bl_label = "Attribute Viewer"
     bl_space_type = 'NODE_EDITOR'
     bl_region_type = 'UI'
-    bl_category = "Attribute Visualiser"
+    bl_category = "Attribute Viewer"
 
     def draw(self, context: bpy.types.Context):
         layout = self.layout
-        layout.operator(AV_AddViewer.bl_idname)
+        layout.operator(AV_AddViewer.bl_idname).use_popup = True
+        layout.operator(AV_RemoveAllViewers.bl_idname)
+
+
+class AV_AttributeMenu(GeoNodesEditorOnlyMixin, bpy.types.Menu):
+    bl_idname = "NODE_MT_attribute_viewer_attribute_menu"
+    bl_label = "Add Viewer"
+    
+    def draw(self, context: bpy.types.Context):
+        layout = self.layout
+        for type_, readable, _ in AV_AddViewer.get_viewer_enum_items():
+            layout.operator(AV_AddViewer.bl_idname, text=readable).viewer_type = type_
+
+
+class AV_MainMenu(GeoNodesEditorOnlyMixin, bpy.types.Menu):
+    bl_idname = "NODE_MT_attribute_viewer_main_menu"
+    bl_label = "Attribute Viewer"
+    
+    def draw(self, context: bpy.types.Context):
+        layout = self.layout
+        layout.menu(AV_AttributeMenu.bl_idname, icon='ADD')
+        layout.separator()
         layout.operator(AV_RemoveAllViewers.bl_idname)
 
 
 # TODO: Change keymaps to not interfere with node wrangler :)
 KEYMAP_DEFINITIONS = (
-    (AV_ViewAttribute.bl_idname, 'MIDDLEMOUSE', 'PRESS', True, True, False),
-    (AV_RemoveViewer.bl_idname, 'RIGHTMOUSE', 'PRESS', True, True, False),
+    (AV_ViewAttribute.bl_idname, 'MIDDLEMOUSE', 'PRESS', True, True, False, {}),
+    (AV_RemoveViewer.bl_idname, 'RIGHTMOUSE', 'PRESS', True, True, False, {}),
+    ("wm.call_menu", 'W', 'PRESS', True, True, False, {'name': AV_MainMenu.bl_idname})
 )
 
 CLASSES = [
     Preferences,
+    # Operators
     AV_ViewAttribute,
     AV_AddViewer,
     AV_RemoveViewer,
     AV_RemoveAllViewers,
-    AV_Panel
+    # Panels
+    AV_Panel,
+    # Menu
+    AV_AttributeMenu,
+    AV_MainMenu,
 ]
 
 REGISTERED_KEYMAPS = []
@@ -424,8 +458,12 @@ def register_keymaps():
         return
     
     keymap = kc.keymaps.new(name='Node Editor', space_type='NODE_EDITOR')
-    for op, key, event, ctrl, shift, alt in KEYMAP_DEFINITIONS:
+    for op, key, event, ctrl, shift, alt, props in KEYMAP_DEFINITIONS:
         keymap_item = keymap.keymap_items.new(op, key, event, ctrl=ctrl, shift=shift, alt=alt)
+        if len(props) > 0:
+            for prop, value in props.items():
+                setattr(keymap_item.properties, prop, value)
+    
         REGISTERED_KEYMAPS.append((keymap, keymap_item))
 
 
