@@ -308,11 +308,6 @@ class AV_ViewAttribute(GeoNodesEditorOnlyMixin, bpy.types.Operator):
                     safe_get_active_object(context),
                     attribute_viewer
                 )
-            # TODO: 
-            # - Auto-connect geometry input? (how to figure that out)
-            # - - if has geometry output, use that one
-            # - - if selected node has only geometry socket, reconnect only that one
-            # - Auto-connect geometry output with join geometry of the group output
         
         return {'FINISHED'}
 
@@ -522,7 +517,3 @@ def unregister():
         keymap.keymap_items.remove(keymap_item)
     
     REGISTERED_KEYMAPS.clear()
-
-
-    
-
