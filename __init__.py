@@ -341,8 +341,6 @@ class AV_AddViewer(GeoNodesEditorOnlyMixin, bpy.types.Operator):
         items=lambda _, __: AV_AddViewer.get_viewer_enum_items(),
     )
 
-    use_popup: bpy.props.BoolProperty(options={'HIDDEN'})
-
     @staticmethod
     def get_viewer_enum_items() -> typing.Iterable[typing.Tuple[str, str, str]]:
         enum_items = []
@@ -365,10 +363,7 @@ class AV_AddViewer(GeoNodesEditorOnlyMixin, bpy.types.Operator):
 
     def invoke(self, context: bpy.types.Context, event: bpy.types.Event):
         self.mouse_position = mouse_to_region_coords(context, event)
-        if self.use_popup:
-            return context.window_manager.invoke_props_dialog(self)
-        else:
-            return self.execute(context)
+        return self.execute(context)
 
     def execute(self, context: bpy.types.Context):
         space: bpy.types.SpaceNodeEditor = context.space_data
@@ -416,20 +411,6 @@ class AV_QuickView(GeoNodesEditorOnlyMixin, bpy.types.Operator):
     # - vertex color
     # - vertex position
 
-
-class AV_Panel(GeoNodesEditorOnlyMixin, bpy.types.Panel):
-    bl_idname = "NODE_PT_attribute_viewer"
-    bl_label = "Attribute Viewer"
-    bl_space_type = 'NODE_EDITOR'
-    bl_region_type = 'UI'
-    bl_category = "Attribute Viewer"
-
-    def draw(self, context: bpy.types.Context):
-        layout = self.layout
-        layout.operator(AV_AddViewer.bl_idname).use_popup = True
-        layout.operator(AV_RemoveAllViewers.bl_idname)
-
-
 class AV_AttributeMenu(GeoNodesEditorOnlyMixin, bpy.types.Menu):
     bl_idname = "NODE_MT_attribute_viewer_attribute_menu"
     bl_label = "Add Viewer"
@@ -451,6 +432,15 @@ class AV_MainMenu(GeoNodesEditorOnlyMixin, bpy.types.Menu):
         layout.separator()
         layout.operator(AV_RemoveAllViewers.bl_idname, icon='PANEL_CLOSE')
 
+class AV_Panel(GeoNodesEditorOnlyMixin, bpy.types.Panel):
+    bl_idname = "NODE_PT_attribute_viewer"
+    bl_label = "Attribute Viewer"
+    bl_space_type = 'NODE_EDITOR'
+    bl_region_type = 'UI'
+    bl_category = "Attribute Viewer"
+
+    def draw(self, context: bpy.types.Context):
+        AV_MainMenu.draw(self, context)
 
 # TODO: Change keymaps to not interfere with node wrangler :)
 KEYMAP_DEFINITIONS = (
