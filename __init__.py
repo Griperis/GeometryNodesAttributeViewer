@@ -29,8 +29,8 @@ GEONODES_PATH = os.path.join("data", "attribute_viewer_nodes.blend")
 SOCKETS_NODE_NAME_MAP = {
     # bpy.types.NodeSocketBool: "AV_BoolAttributeViewer",
     bpy.types.NodeSocketFloat: "AV_FloatAttributeViewer",
-    # bpy.types.NodeSocketInt: "AV_IntAttributeViewer",
-    # bpy.types.NodeSocketVector: "AV_VectorAttributeViewer",
+    bpy.types.NodeSocketInt: "AV_IntAttributeViewer",
+    bpy.types.NodeSocketVector: "AV_VectorAttributeViewer",
     # bpy.types.NodeSocketColor: "AV_ColorAttributeViewer",
 }
 
