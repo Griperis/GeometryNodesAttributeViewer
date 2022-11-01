@@ -195,6 +195,10 @@ class AV_ViewAttribute(GeoNodesEditorOnlyMixin, bpy.types.Operator):
 
         if ('FINISHED' in bpy.ops.node.select(location=(event.mouse_x, event.mouse_y))):
             active_node = node_tree.nodes.active
+            if is_viewer_node(active_node):
+                self.report({'WARNING'}, "Can't view attribute from itself!")
+                return {'FINISHED'}
+                
             ensure_viewer_nodes_loaded()
             # Connect active socket if any, or list through the sockets on click
             viewable_sockets = list(filter_applicable_sockets(active_node.outputs))
