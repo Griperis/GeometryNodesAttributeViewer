@@ -5,12 +5,15 @@
 # Some of the code is inspired by the awesome 'Node Wrangler' addon, thanks goes to the
 # authors Bartek Skorupa, Greg Zaal, Sebastian Koenig, Christian Brinkmann, Florian Meyer
 
+# Thanks to 'user3597862' for the code snipped used to implement 'mouse_to_region_coords' method
+# https://blender.stackexchange.com/questions/218096/translate-area-mouse-coordinates-to-the-the-node-editors-blackboard-coordinates
+
 bl_info = {
     "name": "Attribute Viewer",
     "author": "Zdenek Dolezal",
     "version": (1, 0, 0),
     "blender": (3, 3, 0),
-    "location": "Node Editor N-panel or Shift-V",
+    "location": "Node Editor N-panel or Ctrl-Shift-W",
     "description": "",
     "category": "Node",
 }
@@ -158,6 +161,17 @@ def adjust_viewer_text_size(obj: bpy.types.Object, viewer: bpy.types.GeometryNod
     text_size = max(obj.dimensions) * GLOBAL_SCALE_FACTOR
     input: bpy.types.NodeSocketFloat = viewer.inputs.get("Scale")
     input.default_value = text_size
+
+
+def mouse_to_region_coords(
+    context: bpy.types.Context,
+    event: bpy.types.Event
+) -> typing.Tuple[float, float]:
+
+    region = context.region.view2d  
+    ui_scale = context.preferences.system.ui_scale     
+    x, y = region.region_to_view(event.mouse_region_x, event.mouse_region_y)
+    return (x / ui_scale, y / ui_scale)
 
 
 class Preferences(bpy.types.AddonPreferences):
@@ -346,7 +360,7 @@ class AV_AddViewer(GeoNodesEditorOnlyMixin, bpy.types.Operator):
         layout.prop(self, "viewer_type")
 
     def invoke(self, context: bpy.types.Context, event: bpy.types.Event):
-        self.mouse_position = (event.mouse_x, event.mouse_y)
+        self.mouse_position = mouse_to_region_coords(context, event)
         if self.use_popup:
             return context.window_manager.invoke_props_dialog(self)
         else:
@@ -357,8 +371,15 @@ class AV_AddViewer(GeoNodesEditorOnlyMixin, bpy.types.Operator):
         node_tree = space.node_tree
         ensure_viewer_nodes_loaded()
         selected_socket_type = AV_AddViewer.get_socket_type_from_enum_item(self.viewer_type)
-        new_attribute_viewer(node_tree, selected_socket_type) 
-        return {'FINISHED'}
+        viewer = new_attribute_viewer(node_tree, selected_socket_type) 
+        viewer.location = self.mouse_position
+
+        # Deselect all nodes in order to not move them with following operator
+        for node in node_tree.nodes:
+            node.select = False
+
+        viewer.select = True
+        return bpy.ops.node.translate_attach_remove_on_cancel('INVOKE_DEFAULT')
 
 
 
