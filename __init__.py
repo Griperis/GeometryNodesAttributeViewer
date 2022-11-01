@@ -296,6 +296,7 @@ class GeoNodesEditorOnlyMixin:
     @classmethod
     def poll(cls, context: bpy.types.Context) -> bool:
         return context.space_data.type == 'NODE_EDITOR' and \
+            context.space_data.node_tree is not None and \
             context.space_data.node_tree.type == 'GEOMETRY'
 
 
