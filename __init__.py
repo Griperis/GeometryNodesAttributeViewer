@@ -31,7 +31,7 @@ SOCKETS_NODE_NAME_MAP = {
     bpy.types.NodeSocketFloat: "AV_FloatAttributeViewer",
     bpy.types.NodeSocketInt: "AV_IntAttributeViewer",
     bpy.types.NodeSocketVector: "AV_VectorAttributeViewer",
-    # bpy.types.NodeSocketColor: "AV_ColorAttributeViewer",
+    bpy.types.NodeSocketColor: "AV_ColorAttributeViewer",
 }
 
 GLOBAL_SCALE_FACTOR = 0.1
