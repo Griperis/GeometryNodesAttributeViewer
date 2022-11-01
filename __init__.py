@@ -442,9 +442,10 @@ class AV_MainMenu(GeoNodesEditorOnlyMixin, bpy.types.Menu):
     
     def draw(self, context: bpy.types.Context):
         layout = self.layout
+        layout.operator_context = 'INVOKE_DEFAULT'
         layout.menu(AV_AttributeMenu.bl_idname, icon='ADD')
         layout.separator()
-        layout.operator(AV_RemoveAllViewers.bl_idname)
+        layout.operator(AV_RemoveAllViewers.bl_idname, icon='PANEL_CLOSE')
 
 
 # TODO: Change keymaps to not interfere with node wrangler :)
