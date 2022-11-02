@@ -41,6 +41,12 @@ VIEWER_NAMES = {
 # How to scale text when it is spawned (so it looks somewhat good)
 GLOBAL_SCALE_FACTOR = 0.1
 
+
+def get_readable_viewer_name(name: str):
+    _, middle, _ = name.split("_")
+    return middle.replace("-", " ")        
+
+
 class Preferences(bpy.types.AddonPreferences):
     bl_idname = __package__
     
@@ -115,7 +121,7 @@ class Preferences(bpy.types.AddonPreferences):
         ret = []
         for name, viewer_type in VIEWER_NAMES.items():
             if socket_type == viewer_type:
-                _, readable_name, _ = name.split("_")
+                readable_name = get_readable_viewer_name(name)
                 ret.append((name, readable_name, readable_name))
 
         return ret 
@@ -528,8 +534,8 @@ class AV_AddViewer(GeoNodesEditorOnlyMixin, bpy.types.Operator):
     def get_viewer_enum_items() -> typing.Iterable[typing.Tuple[str, str, str]]:
         enum_items = []
         for name in VIEWER_NAMES:
-            _, type_, _ = name.split("_")
-            enum_items.append((name.upper(), type_, type_))
+            readable_name = get_readable_viewer_name(name)
+            enum_items.append((name, readable_name, readable_name))
 
         return enum_items
 
