@@ -298,11 +298,20 @@ def new_node_group(node_tree: bpy.types.NodeTree, name: str) -> bpy.types.NodeCu
     return node
 
 
-def new_attribute_viewer(
+def new_attribute_viewer_from_socket_type(
     node_tree: bpy.types.NodeTree,
     socket_type: typing.Type[bpy.types.NodeSocket]
 ) -> bpy.types.GeometryNodeGroup:
     node = new_node_group(node_tree, get_preferences().get_viewer_name_for_socket_type(socket_type))
+    get_preferences().apply_defaults(node)
+    return node
+
+
+def new_attribute_viewer_from_name(
+    node_tree: bpy.types.NodeTree,
+    name: str
+) -> bpy.types.GeometryNodeGroup:
+    node = new_node_group(node_tree, name)
     get_preferences().apply_defaults(node)
     return node
 
@@ -317,7 +326,7 @@ def get_attribute_viewer(
     is_new = False
     attribute_viewers = find_attribute_viewer_nodes_for_socket(node_tree, socket)
     if not reuse_nodes or len(attribute_viewers) == 0:
-        node_group = new_attribute_viewer(node_tree, type(socket)) 
+        node_group = new_attribute_viewer_from_socket_type(node_tree, type(socket)) 
         is_new = True
     else:
         node_group = attribute_viewers[0]
@@ -570,10 +579,6 @@ class AV_AddViewer(GeoNodesEditorOnlyMixin, bpy.types.Operator):
 
         return enum_items
 
-    @staticmethod
-    def get_socket_type_from_enum_item(item: str) -> bpy.types.NodeSocket:
-        return VIEWER_NAMES[item]
-
     def draw(self, context: bpy.types.Context) -> None:
         layout = self.layout
         layout.prop(self, "viewer_type")
@@ -586,8 +591,7 @@ class AV_AddViewer(GeoNodesEditorOnlyMixin, bpy.types.Operator):
         space: bpy.types.SpaceNodeEditor = context.space_data
         node_tree = space.node_tree
         ensure_viewer_nodes_loaded()
-        selected_socket_type = AV_AddViewer.get_socket_type_from_enum_item(self.viewer_type)
-        viewer = new_attribute_viewer(node_tree, selected_socket_type) 
+        viewer = new_attribute_viewer_from_name(node_tree, self.viewer_type)
         viewer.location = self.mouse_position
         adjust_viewer_text_size(
             safe_get_active_object(context),
