@@ -250,15 +250,18 @@ def is_viewer_node(node: bpy.types.Node) -> bool:
 def is_socket_connected_to_viewer(
     node_tree: bpy.types.NodeTree, 
     from_socket: bpy.types.NodeSocket,
+    check_geometry_socket: bool = False
 ) -> bool:
-    """Returns True if 'from_socket' is already connected to 'attribute' socket of viewer"""
+    """Returns True if 'from_socket' is already connected to 'Attribute' socket of viewer
+    
+    If 'check_geometry_socket' is True, then also 'Geometry' named socket is considered
+    as valid connection.
+    """
+    to_socket_names = ("Attribute", "Geometry") if check_geometry_socket else ("Attribute")
     for link in node_tree.links:
-        if not isinstance(link.to_node, bpy.types.GeometryNodeGroup):
-            continue
-
         if link.from_socket == from_socket and \
             is_viewer_node(link.to_node) and \
-            link.to_socket.name == "Attribute":
+            link.to_socket.name in to_socket_names:
             return True
 
     return False   
@@ -489,30 +492,61 @@ class AV_RemoveViewer(GeoNodesEditorOnlyMixin, bpy.types.Operator):
     bl_idname = "attribute_viewer.remove_viewer"
     bl_label = "Remove Attribute Viewer"
 
-    @classmethod
-    def poll(cls, context: bpy.types.Context) -> bool:
-        return context.space_data.type == 'NODE_EDITOR'
+    nodes_to_remove = []
+    links_to_remove = []
+
+    def draw(self, context: bpy.types.Context):
+        layout = self.layout
+        layout.label(text=f"Going to remove ({len(AV_RemoveViewer.nodes_to_remove)}) viewers "
+            f"and ({len(AV_RemoveViewer.links_to_remove)}) links, OK?"
+        )
 
     def invoke(self, context: bpy.types.Context, event: bpy.types.Event):
         space: bpy.types.SpaceNodeEditor = context.space_data
         node_tree = space.node_tree
+        AV_RemoveViewer.nodes_to_remove.clear()
+        AV_RemoveViewer.links_to_remove.clear()
         
         if ('FINISHED' in bpy.ops.node.select(location=(event.mouse_x, event.mouse_y))):
             active_node = node_tree.nodes.active
-            viewable_sockets = list(filter_applicable_sockets(active_node.outputs))
             viewer_connected_sockets = set()
-            for socket in viewable_sockets:
-                if is_socket_connected_to_viewer(node_tree, socket):
+            for socket in active_node.outputs:
+                if is_socket_connected_to_viewer(node_tree, socket, check_geometry_socket=True):
                     viewer_connected_sockets.add(socket)
 
-            nodes_to_remove = []
             for link in list(node_tree.links):
                 if link.from_socket in viewer_connected_sockets and is_viewer_node(link.to_node):
-                    nodes_to_remove.append(link.to_node)
+                    self.nodes_to_remove.append(link.to_node)
+                    self.links_to_remove.append(link)
+
+            # Don't invoke prompt if there is simple case that is obvious
+            if len(AV_RemoveViewer.nodes_to_remove) == 1 and \
+                len(AV_RemoveViewer.nodes_to_remove) <= 2:
+                for link in self.links_to_remove:
                     node_tree.links.remove(link)
 
-            for node in nodes_to_remove:
-                node_tree.nodes.remove(node)
+                for node in self.nodes_to_remove:
+                    node_tree.nodes.remove(node)
+                
+                return {'FINISHED'}
+            
+            if len(AV_RemoveViewer.nodes_to_remove) == 0 and \
+                len(AV_RemoveViewer.links_to_remove) == 0:
+                return {'FINISHED'}
+
+            return context.window_manager.invoke_props_dialog(self)
+
+        return {'FINISHED'}
+
+    def execute(self, context: bpy.types.Context):
+        space: bpy.types.SpaceNodeEditor = context.space_data
+        node_tree = space.node_tree
+
+        for link in AV_RemoveViewer.links_to_remove:
+            node_tree.links.remove(link)
+
+        for node in AV_RemoveViewer.nodes_to_remove:
+            node_tree.nodes.remove(node)
 
         return {'FINISHED'}
 
