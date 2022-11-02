@@ -264,7 +264,7 @@ def is_socket_connected_to_viewer(
     return False   
 
 
-def find_attribute_viewer_nodes(
+def find_attribute_viewer_nodes_for_socket(
     node_tree: bpy.types.NodeTree,
     socket: bpy.types.NodeSocket
 ) -> typing.List[bpy.types.GeometryNodeGroup]:
@@ -280,17 +280,12 @@ def find_attribute_viewer_nodes(
     return ret
 
 
-def find_first_attribute_viewer(
+def find_attribute_viewer_nodes(
     node_tree: bpy.types.NodeTree
-) -> typing.Optional[bpy.types.GeometryNodeGroup]:
+) -> typing.Iterable[bpy.types.GeometryNodeGroup]:
     for node in node_tree.nodes:
-        if not isinstance(node, bpy.types.GeometryNodeGroup):
-            continue
-
         if is_viewer_node(node):
-            return node
-    
-    return None
+            yield node
 
 
 def new_node_group(node_tree: bpy.types.NodeTree, name: str) -> bpy.types.NodeCustomGroup:
@@ -317,7 +312,7 @@ def get_attribute_viewer(
     # Connects 'socket' from 'node' in 'node_tree' to viewer node
     # and connects the viewer to output
     is_new = False
-    attribute_viewers = find_attribute_viewer_nodes(node_tree, socket)
+    attribute_viewers = find_attribute_viewer_nodes_for_socket(node_tree, socket)
     if not reuse_nodes or len(attribute_viewers) == 0:
         node_group = new_attribute_viewer(node_tree, type(socket)) 
         is_new = True
@@ -425,10 +420,12 @@ class AV_ViewAttribute(GeoNodesEditorOnlyMixin, bpy.types.Operator):
                 # Selected node doesn't have any valid sockets to preview, but we can still
                 # switch the geometry input of the attribute viewer if there is any present
                 if attribute_viewer is None:
-                    attribute_viewer = find_first_attribute_viewer(node_tree)
-                
-                if attribute_viewer is not None:
-                    node_tree.links.new(geometry_socket, attribute_viewer.inputs[0])
+                    all_attribute_viewers = list(find_attribute_viewer_nodes(node_tree))
+                    if len(all_attribute_viewers) > 0:
+                        attribute_viewer = all_attribute_viewers[0]
+
+                    for viewer in all_attribute_viewers:
+                        node_tree.links.new(geometry_socket, viewer.inputs[0])
 
             
             # Connect attribute viewer to output
