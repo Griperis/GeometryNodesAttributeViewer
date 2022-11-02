@@ -26,15 +26,185 @@ import os
 
 GEONODES_PATH = os.path.join("data", "attribute_viewer_nodes.blend") 
 
-SOCKETS_NODE_NAME_MAP = {
-    # bpy.types.NodeSocketBool: "AV_BoolAttributeViewer",
-    bpy.types.NodeSocketFloat: "AV_FloatValueAttributeViewer",
-    bpy.types.NodeSocketInt: "AV_IntValueAttributeViewer",
-    bpy.types.NodeSocketVector: "AV_VectorValueAttributeViewer",
-    bpy.types.NodeSocketColor: "AV_ColorValueAttributeViewer",
+# Main data structure representing what name of nodegroup corresponds to what socket type.
+# If there are more than one viewer for one type, then the default spawned one should be
+# selectable from preferences.
+VIEWER_NAMES = {
+    "AV_Float-Value_AttributeViewer": bpy.types.NodeSocketFloat,
+    "AV_Int-Value_AttributeViewer": bpy.types.NodeSocketInt,
+    "AV_Vector-Value_AttributeViewer": bpy.types.NodeSocketVector,
+    "AV_Vector_AttributeViewer": bpy.types.NodeSocketVector,
+    "AV_Color-Value_AttributeViewer": bpy.types.NodeSocketColor,
+    "AV_Color_AttributeViewer": bpy.types.NodeSocketColor,
 }
 
+# How to scale text when it is spawned (so it looks somewhat good)
 GLOBAL_SCALE_FACTOR = 0.1
+
+class Preferences(bpy.types.AddonPreferences):
+    bl_idname = __package__
+    
+    digits: bpy.props.IntProperty(
+        name="Digits",
+        default=6,
+        min=0
+    )
+    decimals: bpy.props.IntProperty(
+        name="Decimals",
+        default=1,
+        min=0,
+    )
+
+    base: bpy.props.FloatProperty(
+        name="Base (2, 10, 16)",
+        description="Use different base (upto 16 are supported). Convert to PI-base if you want :)",
+        default=10,
+        min=2,
+        max=16
+    )
+
+    scale: bpy.props.FloatProperty(
+        name="Text Scale",
+        default=1,
+        min=0
+    )
+
+    color: bpy.props.FloatVectorProperty(
+        name="Color",
+        subtype='COLOR',
+        size=4,
+        default=(0.799103, 0.337164, 0.006995, 1.0)
+    )
+
+    offset_along_normals: bpy.props.BoolProperty(
+        name="Offset Along Normals",
+        default=False,
+    )
+    offset: bpy.props.FloatVectorProperty(
+        name="Offset",
+        size=3,
+        default=(0.0, 0.0, 0.0)
+    )
+
+    viewport_only: bpy.props.BoolProperty(
+        name="Viewport Only",
+        description="If toggled, then viewer geometry is shown only in viewport",
+        default=True
+    )
+    show_geometry: bpy.props.BoolProperty(
+        name="Show Original Geometry",
+        description="If toggled, original geometry is output with the added geometry",
+        default=True
+    )
+
+    collapse_default_settings: bpy.props.BoolProperty()
+
+    default_color_viewer: bpy.props.EnumProperty(
+        name="Default Color Viewer",
+        description="What 'Color Viewer' to spawn when using 'ViewAttribute' operator",
+        items=lambda self, _: self.get_default_viewer_enum_items(bpy.types.NodeSocketColor)
+    )
+
+    default_vector_viewer: bpy.props.EnumProperty(
+        name="Default Vector Viewer",
+        description="What 'Vector Viewer' to spawn when using 'ViewAttribute' operator",
+        items=lambda self, _: self.get_default_viewer_enum_items(bpy.types.NodeSocketVector)
+    )
+
+    def get_default_viewer_enum_items(self, socket_type: typing.Type[bpy.types.NodeSocket]):
+        ret = []
+        for name, viewer_type in VIEWER_NAMES.items():
+            if socket_type == viewer_type:
+                _, readable_name, _ = name.split("_")
+                ret.append((name, readable_name, readable_name))
+
+        return ret 
+
+    def get_viewer_name_for_socket_type(
+        self,
+        socket_type: typing.Type[bpy.types.NodeSocket]
+    ) -> str:
+        if socket_type == bpy.types.NodeSocketColor:
+            return self.default_color_viewer
+        elif socket_type == bpy.types.NodeSocketVector:
+            return self.default_vector_viewer
+        else:
+            for name, socket_type in VIEWER_NAMES.items():
+                if socket_type == socket_type:
+                    return name
+
+        raise ValueError(f"Unsupported socket type to view: {socket_type}")
+            
+
+    def draw(self, context: bpy.types.Context) -> None:
+        layout: bpy.types.UILayout = self.layout
+        row = layout.row()
+        row.label(text="Default Viewers", icon='COMMUNITY')
+        row = row.row()
+        row.enabled = False
+        row.alignment = 'LEFT'
+        row.label(text="(What viewer to spawn when viewing automatically)")
+        col = layout.column()
+        col.prop(self, "default_vector_viewer")
+        col.prop(self, "default_color_viewer")
+        
+        row = layout.row(align=True)
+        icon = 'TRIA_RIGHT' if self.collapse_default_settings else 'TRIA_DOWN'
+        row.prop(self, "collapse_default_settings", icon_only=True, icon=icon, emboss=False)
+        row.label(text="Default Viewer Settings")
+        row = row.row()
+        row.enabled = False
+        row.alignment = 'LEFT'
+        row.label(text="(Automatically set properties for newly spawned viewers)")
+        if not self.collapse_default_settings:
+            col = layout.column()
+            row = col.row()
+            row.enabled = False
+            row.label(text="Numbers")
+            col.prop(self, "digits")
+            col.prop(self, "decimals")
+            col.prop(self, "base")
+            col.separator()
+            
+            row = col.row()
+            row.enabled = False
+            row.label(text="Appearance") 
+            col.prop(self, "scale")
+            col.prop(self, "color")
+            col.separator()
+            col.prop(self, "offset_along_normals")
+            col.prop(self, "offset")
+            col.separator()
+            col.prop(self, "viewport_only")
+            col.prop(self, "show_geometry")
+
+    def apply_defaults(self, node: bpy.types.GeometryNodeGroup) -> None:
+        for prop_name in self.customizable_prop_defaults:
+            for input_ in node.inputs:
+                if prop_name == input_.name.lower():
+                    input_.default_value = getattr(self, prop_name)
+                    break 
+
+    @property
+    def customizable_prop_defaults(self):
+        return [
+            "digits",
+            "decimals",
+            "base",
+            "scale",
+            "color", 
+            "offset_along_normals",
+            "viewport_only",
+            "show_geometry"
+        ]
+
+
+def get_preferences(context: typing.Optional[bpy.types.Context] = None) -> Preferences:
+    if context is None:
+        context = bpy.context
+
+    return context.preferences.addons[__package__].preferences
+    
 
 def get_geonodes_path() -> str:
     return os.path.abspath(GEONODES_PATH)
@@ -42,7 +212,7 @@ def get_geonodes_path() -> str:
 
 def ensure_viewer_nodes_loaded(link: bool = True):
     with bpy.data.libraries.load(get_geonodes_path(), link=link) as (data_from, data_to):
-        for node_group_name in SOCKETS_NODE_NAME_MAP.values():
+        for node_group_name in VIEWER_NAMES:
             if node_group_name in bpy.data.node_groups:
                 # TODO: if linked and from library, then refresh
                 # if not linked, then link and use the linked one to
@@ -51,6 +221,7 @@ def ensure_viewer_nodes_loaded(link: bool = True):
                 assert node_group_name in data_from.node_groups
                 data_to.node_groups.append(node_group_name)
                 
+
 def filter_applicable_sockets(
     node_outputs: typing.Iterable[bpy.types.NodeSocket]
 ) -> typing.Iterable[bpy.types.NodeSocket]:
@@ -58,7 +229,7 @@ def filter_applicable_sockets(
         if socket.hide or not socket.enabled:
             continue
 
-        if isinstance(socket, tuple(SOCKETS_NODE_NAME_MAP.keys())):
+        if isinstance(socket, tuple(VIEWER_NAMES.values())):
             yield socket
 
 
@@ -67,7 +238,7 @@ def is_viewer_node(node: bpy.types.Node) -> bool:
         return False
     
     assert hasattr(node, "node_tree")
-    return node.node_tree.name.startswith(tuple(SOCKETS_NODE_NAME_MAP.values()))
+    return node.node_tree.name.startswith(tuple(VIEWER_NAMES))
 
 
 def is_socket_connected_to_viewer(
@@ -75,12 +246,12 @@ def is_socket_connected_to_viewer(
     from_socket: bpy.types.NodeSocket,
 ) -> bool:
     """Returns True if 'from_socket' is already connected to 'attribute' socket of viewer"""
-    viewer_name = SOCKETS_NODE_NAME_MAP[type(from_socket)]
     for link in node_tree.links:
         if not isinstance(link.to_node, bpy.types.GeometryNodeGroup):
             continue
 
-        if link.from_socket == from_socket and viewer_name in link.to_node.node_tree.name and \
+        if link.from_socket == from_socket and \
+            is_viewer_node(link.to_node) and \
             link.to_socket.name == "Attribute":
             return True
 
@@ -92,7 +263,7 @@ def find_attribute_viewer_nodes(
     socket: bpy.types.NodeSocket
 ) -> typing.List[bpy.types.GeometryNodeGroup]:
     ret = []
-    searched_name = SOCKETS_NODE_NAME_MAP[type(socket)]
+    searched_name = get_preferences().get_viewer_name_for_socket_type(type(socket))
     for node in node_tree.nodes:
         if not isinstance(node, bpy.types.GeometryNodeGroup):
             continue
@@ -110,7 +281,7 @@ def find_first_attribute_viewer(
         if not isinstance(node, bpy.types.GeometryNodeGroup):
             continue
 
-        if node.node_tree.name.startswith(tuple(SOCKETS_NODE_NAME_MAP.values())):
+        if is_viewer_node(node):
             return node
     
     return None
@@ -127,7 +298,7 @@ def new_attribute_viewer(
     node_tree: bpy.types.NodeTree,
     socket_type: typing.Type[bpy.types.NodeSocket]
 ) -> bpy.types.GeometryNodeGroup:
-    node = new_node_group(node_tree, SOCKETS_NODE_NAME_MAP[socket_type])
+    node = new_node_group(node_tree, get_preferences().get_viewer_name_for_socket_type(socket_type))
     get_preferences().apply_defaults(node)
     return node
 
@@ -190,107 +361,6 @@ def mouse_to_region_coords(
     x, y = region.region_to_view(event.mouse_region_x, event.mouse_region_y)
     return (x / ui_scale, y / ui_scale)
 
-
-class Preferences(bpy.types.AddonPreferences):
-    bl_idname = __package__
-    
-    digits: bpy.props.IntProperty(
-        name="Digits",
-        default=6,
-        min=0
-    )
-    decimals: bpy.props.IntProperty(
-        name="Decimals",
-        default=1,
-        min=0,
-    )
-
-    base: bpy.props.FloatProperty(
-        name="Base (2, 10, 16)",
-        description="Use different base (upto 16 are supported). Convert to PI-base if you want :)",
-        default=10,
-        min=2,
-        max=16
-    )
-
-    scale: bpy.props.FloatProperty(
-        name="Text Scale",
-        default=1,
-        min=0
-    )
-
-    color: bpy.props.FloatVectorProperty(
-        name="Color",
-        subtype='COLOR',
-        size=4,
-        default=(0.799103, 0.337164, 0.006995, 1.0)
-    )
-
-    offset_along_normals: bpy.props.BoolProperty(
-        name="Offset Along Normals",
-        default=False,
-    )
-    offset: bpy.props.FloatVectorProperty(
-        name="Offset",
-        size=3,
-        default=(0.0, 0.0, 0.0)
-    )
-
-    viewport_only: bpy.props.BoolProperty(
-        name="Viewport Only",
-        description="If toggled, then viewer geometry is shown only in viewport",
-        default=True
-    )
-    show_geometry: bpy.props.BoolProperty(
-        name="Show Original Geometry",
-        description="If toggled, original geometry is output with the added geometry",
-        default=True
-    )
-
-    collapse_default_settings: bpy.props.BoolProperty()
-
-    def draw(self, context: bpy.types.Context) -> None:
-        layout: bpy.types.UILayout = self.layout
-        row = layout.row(align=True)
-        icon = 'TRIA_RIGHT' if self.collapse_default_settings else 'TRIA_DOWN'
-        row.prop(self, "collapse_default_settings", icon_only=True, icon=icon, emboss=False)
-        row.label(text="Default Viewer Settings (for newly spawned viewers)")
-        if not self.collapse_default_settings:
-            col = layout.column()
-            row = col.row()
-            row.enabled = False
-            row.label(text="Numbers")
-            col.prop(self, "digits")
-            col.prop(self, "decimals")
-            col.prop(self, "base")
-            col.separator()
-            
-            row = col.row()
-            row.enabled = False
-            row.label(text="Appearance") 
-            col.prop(self, "scale")
-            col.prop(self, "color")
-            col.separator()
-            col.prop(self, "offset_along_normals")
-            col.prop(self, "offset")
-            col.separator()
-            col.prop(self, "viewport_only")
-            col.prop(self, "show_geometry")
-
-    def apply_defaults(self, node: bpy.types.GeometryNodeGroup) -> None:
-        for prop_name in self.__annotations__:
-            for input_ in node.inputs:
-                if prop_name == input_.name.lower():
-                    input_.default_value = getattr(self, prop_name)
-                    break 
-
-
-def get_preferences(context: typing.Optional[bpy.types.Context] = None) -> Preferences:
-    if context is None:
-        context = bpy.context
-
-    return context.preferences.addons[__package__].preferences
-    
 
 class GeoNodesEditorOnlyMixin:
     @classmethod
@@ -457,18 +527,15 @@ class AV_AddViewer(GeoNodesEditorOnlyMixin, bpy.types.Operator):
     @staticmethod
     def get_viewer_enum_items() -> typing.Iterable[typing.Tuple[str, str, str]]:
         enum_items = []
-        for _, value in SOCKETS_NODE_NAME_MAP.items():
-            type_ = value[len("AV_"):-len("AttributeViewer")]
-            enum_items.append((type_.upper(), type_, type_))
+        for name in VIEWER_NAMES:
+            _, type_, _ = name.split("_")
+            enum_items.append((name.upper(), type_, type_))
 
         return enum_items
 
     @staticmethod
     def get_socket_type_from_enum_item(item: str) -> bpy.types.NodeSocket:
-        for socket_type, viewer_name in SOCKETS_NODE_NAME_MAP.items():
-            # 'float' in 'av_floatattributeviewer'
-            if item.lower() in viewer_name.lower():
-                return socket_type
+        return VIEWER_NAMES[item]
 
     def draw(self, context: bpy.types.Context) -> None:
         layout = self.layout
