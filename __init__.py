@@ -135,8 +135,8 @@ class Preferences(bpy.types.AddonPreferences):
         elif socket_type == bpy.types.NodeSocketVector:
             return self.default_vector_viewer
         else:
-            for name, socket_type in VIEWER_NAMES.items():
-                if socket_type == socket_type:
+            for name, viewer_socket_type in VIEWER_NAMES.items():
+                if socket_type == viewer_socket_type:
                     return name
 
         raise ValueError(f"Unsupported socket type to view: {socket_type}")
