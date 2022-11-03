@@ -244,6 +244,9 @@ def is_viewer_node(node: bpy.types.Node) -> bool:
         return False
     
     assert hasattr(node, "node_tree")
+    if node.node_tree is None:
+        return False
+        
     return node.node_tree.name.startswith(tuple(VIEWER_NAMES))
 
 
