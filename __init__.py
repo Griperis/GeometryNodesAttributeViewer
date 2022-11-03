@@ -246,7 +246,7 @@ def is_viewer_node(node: bpy.types.Node) -> bool:
     assert hasattr(node, "node_tree")
     if node.node_tree is None:
         return False
-        
+
     return node.node_tree.name.startswith(tuple(VIEWER_NAMES))
 
 
@@ -417,7 +417,7 @@ class AV_ViewAttribute(GeoNodesEditorOnlyMixin, bpy.types.Operator):
 
                 # Disconnect other sockets going to viewer and connect this one
                 for link in list(node_tree.links):
-                    if link.from_socket in viewable_sockets:
+                    if link.from_socket in viewable_sockets and is_viewer_node(link.to_node):
                         node_tree.links.remove(link)
 
                 socket_to_view = viewable_sockets[idx]
