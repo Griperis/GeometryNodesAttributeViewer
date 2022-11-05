@@ -424,9 +424,11 @@ class AV_ViewAttribute(GeoNodesEditorOnlyMixin, bpy.types.Operator):
                         break
 
                 # Disconnect other sockets going to viewer and connect this one
+                prev_viewer_location = None
                 for link in list(node_tree.links):
                     to_node = link.to_node
                     if link.from_socket in viewable_sockets and is_viewer_node(to_node):
+                        prev_viewer_location = to_node.location
                         node_tree.links.remove(link)
                         # Also remove other viewers
                         node_tree.nodes.remove(to_node)
@@ -437,8 +439,9 @@ class AV_ViewAttribute(GeoNodesEditorOnlyMixin, bpy.types.Operator):
                     node_tree.links.new(prev_geometry_socket, attribute_viewer.inputs[0])
                 node_tree.links.new(socket_to_view, attribute_viewer.inputs[1])
 
-                # adjust attribute viewer location
-                if is_new:
+                if prev_viewer_location:
+                    attribute_viewer.location = prev_viewer_location
+                elif is_new:
                     attribute_viewer.location = (active_node.location.x + 400, active_node.location.y) 
                 
             geometry_socket = get_first_geometry_output(active_node)
