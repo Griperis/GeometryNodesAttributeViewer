@@ -415,6 +415,14 @@ class AV_ViewAttribute(GeoNodesEditorOnlyMixin, bpy.types.Operator):
                 if idx == len(viewable_sockets):
                     idx = 0
 
+                # find geometry links connected to viewer
+                prev_geometry_socket = None
+                for link in list(node_tree.links):
+                    if is_viewer_node(link.to_node) and \
+                        isinstance(link.to_socket, bpy.types.NodeSocketGeometry):
+                        prev_geometry_socket = link.from_socket
+                        break
+
                 # Disconnect other sockets going to viewer and connect this one
                 for link in list(node_tree.links):
                     to_node = link.to_node
@@ -425,6 +433,8 @@ class AV_ViewAttribute(GeoNodesEditorOnlyMixin, bpy.types.Operator):
 
                 socket_to_view = viewable_sockets[idx]
                 is_new, attribute_viewer = get_attribute_viewer(node_tree, socket_to_view)
+                if prev_geometry_socket:
+                    node_tree.links.new(prev_geometry_socket, attribute_viewer.inputs[0])
                 node_tree.links.new(socket_to_view, attribute_viewer.inputs[1])
 
                 # adjust attribute viewer location
