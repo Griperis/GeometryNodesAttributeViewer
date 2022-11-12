@@ -373,6 +373,12 @@ def adjust_viewer_text_size(
     if obj is None or math.isclose(size_factor, 0.0) or size_factor < 0:
         size_factor = 1.0
 
+    # No autoscale for unapplied scale
+    if not (math.isclose(obj.scale.x, 1.0) and \
+        math.isclose(obj.scale.y, 1.0) and \
+        math.isclose(obj.scale.z, 1.0)):
+        return
+
     text_size = size_factor * GLOBAL_SCALE_FACTOR
     input: bpy.types.NodeSocketFloat = viewer.inputs.get("Scale")
     input.default_value = text_size
