@@ -43,8 +43,24 @@ GLOBAL_SCALE_FACTOR = 0.1
 
 
 def get_readable_viewer_name(name: str):
-    _, middle, _ = name.split("_")
-    return middle.replace("-", " ")        
+    split = name.split("_")
+    if len(split) == 3:
+        _, middle, _ = name.split("_")
+        return middle.replace("-", " ")        
+
+    return name
+
+
+def rename_viewer_to_human(node: bpy.types.Node) -> None:
+    if not isinstance(node, bpy.types.GeometryNodeGroup):
+        return
+    
+    if node.node_tree is None:
+        return
+    
+    nice_name = "View " + get_readable_viewer_name(node.node_tree.name)
+    node.name = nice_name
+    node.label = nice_name
 
 
 class Preferences(bpy.types.AddonPreferences):
@@ -299,6 +315,7 @@ def new_attribute_viewer_from_socket_type(
     socket_type: typing.Type[bpy.types.NodeSocket]
 ) -> bpy.types.GeometryNodeGroup:
     node = new_node_group(node_tree, get_preferences().get_viewer_name_for_socket_type(socket_type))
+    rename_viewer_to_human(node)
     get_preferences().apply_defaults(node)
     return node
 
@@ -308,6 +325,7 @@ def new_attribute_viewer_from_name(
     name: str
 ) -> bpy.types.GeometryNodeGroup:
     node = new_node_group(node_tree, name)
+    rename_viewer_to_human(node)
     get_preferences().apply_defaults(node)
     return node
 
