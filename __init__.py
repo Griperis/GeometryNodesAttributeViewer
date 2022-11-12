@@ -422,106 +422,101 @@ class AV_ViewAttribute(GeoNodesEditorOnlyMixin, bpy.types.Operator):
                     viewer_connected_idx = i
                     break
             
-            attribute_viewer = None
-            if len(viewable_sockets) > 0:
-                idx = viewer_connected_idx + 1
-                if idx == len(viewable_sockets):
-                    idx = 0
-
-                # find geometry links connected to viewer
-                prev_geometry_socket = None
-                for link in list(node_tree.links):
-                    if is_viewer_node(link.to_node) and \
-                        isinstance(link.to_socket, bpy.types.NodeSocketGeometry):
-                        prev_geometry_socket = link.from_socket
-                        break
-
-                # Disconnect other sockets going to viewer and connect this one
-                prev_viewer_location = None
-                for link in list(node_tree.links):
-                    to_node = link.to_node
-                    if link.from_socket in viewable_sockets and is_viewer_node(to_node):
-                        prev_viewer_location = to_node.location
-                        node_tree.links.remove(link)
-                        # Also remove other viewers
-                        node_tree.nodes.remove(to_node)
-
-                socket_to_view = viewable_sockets[idx]
-                is_new, attribute_viewer = get_attribute_viewer(node_tree, socket_to_view)
-                if prev_geometry_socket:
-                    node_tree.links.new(prev_geometry_socket, attribute_viewer.inputs[0])
-                node_tree.links.new(socket_to_view, attribute_viewer.inputs[1])
-
-                if prev_viewer_location:
-                    attribute_viewer.location = prev_viewer_location
-                elif is_new:
-                    attribute_viewer.location = (active_node.location.x + 400, active_node.location.y) 
-                
             geometry_socket = get_first_geometry_output(active_node)
             # Attribute viewer is connected to socket, but also has geometry socket that
             # could be connected and isn't
             if geometry_socket is not None:
                 # Selected node doesn't have any valid sockets to preview, but we can still
                 # switch the geometry input of the attribute viewer if there is any present
-                if attribute_viewer is None:
-                    all_attribute_viewers = list(find_attribute_viewer_nodes(node_tree))
-                    if len(all_attribute_viewers) > 0:
-                        attribute_viewer = all_attribute_viewers[0]
+                all_attribute_viewers = list(find_attribute_viewer_nodes(node_tree))
+                for viewer in all_attribute_viewers:
+                    node_tree.links.new(geometry_socket, viewer.inputs[0])
 
-                    for viewer in all_attribute_viewers:
-                        node_tree.links.new(geometry_socket, viewer.inputs[0])
+            if len(viewable_sockets) == 0:
+                return {'FINISHED'}
 
-            
+            idx = viewer_connected_idx + 1
+            if idx == len(viewable_sockets):
+                idx = 0
+
+            # find geometry links connected to viewer
+            prev_geometry_socket = None
+            for link in list(node_tree.links):
+                if is_viewer_node(link.to_node) and \
+                    isinstance(link.to_socket, bpy.types.NodeSocketGeometry):
+                    prev_geometry_socket = link.from_socket
+                    break
+
+            # Disconnect other sockets going to viewer and connect this one
+            prev_viewer_location = None
+            for link in list(node_tree.links):
+                to_node = link.to_node
+                if link.from_socket in viewable_sockets and is_viewer_node(to_node):
+                    prev_viewer_location = to_node.location
+                    node_tree.links.remove(link)
+                    # Also remove other viewers
+                    node_tree.nodes.remove(to_node)
+
+            socket_to_view = viewable_sockets[idx]
+            is_new, attribute_viewer = get_attribute_viewer(node_tree, socket_to_view)
+            if prev_geometry_socket:
+                node_tree.links.new(prev_geometry_socket, attribute_viewer.inputs[0])
+            node_tree.links.new(socket_to_view, attribute_viewer.inputs[1])
+
+            if prev_viewer_location:
+                attribute_viewer.location = prev_viewer_location
+            elif is_new:
+                attribute_viewer.location = (active_node.location.x + 400, active_node.location.y) 
+                            
             # Connect attribute viewer to output
-            if attribute_viewer is not None:
-                output_node = None
-                for node in node_tree.nodes:
-                    if not isinstance(node, bpy.types.NodeGroupOutput):
-                        continue
+            output_node = None
+            for node in node_tree.nodes:
+                if not isinstance(node, bpy.types.NodeGroupOutput):
+                    continue
 
-                    output_node = node
+                output_node = node
+                break
+            
+
+            if output_node is not None:
+                output_geo_socket = None
+                for socket in output_node.inputs:
+                    if not isinstance(socket, bpy.types.NodeSocketGeometry):
+                        continue
+                    
+                    output_geo_socket = socket
                     break
                 
+                join_geo_node = None
+                for link in node_tree.links:
+                    if not isinstance(link.from_node, bpy.types.GeometryNodeJoinGeometry):
+                        continue
 
-                if output_node is not None:
-                    output_geo_socket = None
-                    for socket in output_node.inputs:
-                        if not isinstance(socket, bpy.types.NodeSocketGeometry):
-                            continue
-                        
-                        output_geo_socket = socket
+                    if link.to_socket == output_geo_socket:
+                        join_geo_node = link.from_node
                         break
-                    
-                    join_geo_node = None
+                
+                if join_geo_node is None:
+                    join_geo_node = node_tree.nodes.new('GeometryNodeJoinGeometry')
+                    join_geo_node.location = (output_node.location.x - 300, output_node.location.y) 
+                
                     for link in node_tree.links:
-                        if not isinstance(link.from_node, bpy.types.GeometryNodeJoinGeometry):
-                            continue
-
                         if link.to_socket == output_geo_socket:
-                            join_geo_node = link.from_node
+                            node_tree.links.new(join_geo_node.inputs[0], link.from_socket)
                             break
-                    
-                    if join_geo_node is None:
-                        join_geo_node = node_tree.nodes.new('GeometryNodeJoinGeometry')
-                        join_geo_node.location = (output_node.location.x - 300, output_node.location.y) 
-                    
-                        for link in node_tree.links:
-                            if link.to_socket == output_geo_socket:
-                                node_tree.links.new(join_geo_node.inputs[0], link.from_socket)
-                                break
 
-                    found_link = None
-                    for link in node_tree.links:
-                        if link.to_node == join_geo_node and link.from_node == attribute_viewer:
-                            found_link = link
-                            break 
-                    
-                    if found_link is None:
-                        node_tree.links.new(join_geo_node.inputs[0], attribute_viewer.outputs[0])
-                    
-                    node_tree.links.new(join_geo_node.outputs[0], output_geo_socket)
+                found_link = None
+                for link in node_tree.links:
+                    if link.to_node == join_geo_node and link.from_node == attribute_viewer:
+                        found_link = link
+                        break 
+                
+                if found_link is None:
+                    node_tree.links.new(join_geo_node.inputs[0], attribute_viewer.outputs[0])
+                
+                node_tree.links.new(join_geo_node.outputs[0], output_geo_socket)
 
-            if attribute_viewer is not None and context.active_object is not None:
+            if context.active_object is not None:
                 adjust_viewer_text_size(
                     safe_get_active_object(context),
                     attribute_viewer
