@@ -1,4 +1,4 @@
-# Geonodes Attribute Viewer - view and debug geonodes attributes in scene 
+# Geonodes Attribute Viewer - view and debug geonodes attributes in scene
 # Author: Zdenek Dolezal
 # Licence: GPL 3.0
 
@@ -7,6 +7,11 @@
 
 # Thanks to 'user3597862' for the code snipped used to implement 'mouse_to_region_coords' method
 # https://blender.stackexchange.com/questions/218096/translate-area-mouse-coordinates-to-the-the-node-editors-blackboard-coordinates
+
+import os
+import typing
+import math
+import bpy
 
 bl_info = {
     "name": "Attribute Viewer",
@@ -18,13 +23,8 @@ bl_info = {
     "category": "Node",
 }
 
-import bpy
-import math
-import typing
-import os
 
-
-GEONODES_PATH = os.path.join("data", "attribute_viewer_nodes.blend") 
+GEONODES_PATH = os.path.join("data", "attribute_viewer_nodes.blend")
 
 # Main data structure representing what name of nodegroup corresponds to what socket type.
 # If there are more than one viewer for one type, then the default spawned one should be
@@ -48,7 +48,7 @@ def get_readable_viewer_name(name: str):
     split = name.split("_")
     if len(split) == 2:
         _, middle = name.split("_")
-        return middle.replace("-", " ")        
+        return middle.replace("-", " ")
 
     return name
 
@@ -56,10 +56,10 @@ def get_readable_viewer_name(name: str):
 def rename_viewer_to_human(node: bpy.types.Node) -> None:
     if not isinstance(node, bpy.types.GeometryNodeGroup):
         return
-    
+
     if node.node_tree is None:
         return
-    
+
     nice_name = "View " + get_readable_viewer_name(node.node_tree.name)
     node.name = nice_name
     node.label = nice_name
@@ -67,7 +67,7 @@ def rename_viewer_to_human(node: bpy.types.Node) -> None:
 
 class Preferences(bpy.types.AddonPreferences):
     bl_idname = __package__
-    
+
     decimals: bpy.props.IntProperty(
         name="Decimals",
         default=1,
@@ -137,7 +137,7 @@ class Preferences(bpy.types.AddonPreferences):
                 readable_name = get_readable_viewer_name(name)
                 ret.append((name, readable_name, readable_name))
 
-        return ret 
+        return ret
 
     def get_viewer_name_for_socket_type(
         self,
@@ -153,7 +153,6 @@ class Preferences(bpy.types.AddonPreferences):
                     return name
 
         raise ValueError(f"Unsupported socket type to view: {socket_type}")
-            
 
     def draw(self, context: bpy.types.Context) -> None:
         layout: bpy.types.UILayout = self.layout
@@ -166,7 +165,7 @@ class Preferences(bpy.types.AddonPreferences):
         col = layout.column()
         col.prop(self, "default_vector_viewer")
         col.prop(self, "default_color_viewer")
-        
+
         row = layout.row(align=True)
         icon = 'TRIA_RIGHT' if self.collapse_default_settings else 'TRIA_DOWN'
         row.prop(self, "collapse_default_settings", icon_only=True, icon=icon, emboss=False)
@@ -183,10 +182,10 @@ class Preferences(bpy.types.AddonPreferences):
             col.prop(self, "decimals")
             col.prop(self, "base")
             col.separator()
-            
+
             row = col.row()
             row.enabled = False
-            row.label(text="Appearance") 
+            row.label(text="Appearance")
             col.prop(self, "scale")
             col.prop(self, "color")
             col.separator()
@@ -201,7 +200,7 @@ class Preferences(bpy.types.AddonPreferences):
             for input_ in node.inputs:
                 if prop_name == input_.name.lower():
                     input_.default_value = getattr(self, prop_name)
-                    break 
+                    break
 
     @property
     def customizable_prop_defaults(self):
@@ -209,7 +208,7 @@ class Preferences(bpy.types.AddonPreferences):
             "decimals",
             "base",
             "scale",
-            "color", 
+            "color",
             "offset_along_normals",
             "viewport_only",
             "show_geometry"
@@ -221,7 +220,7 @@ def get_preferences(context: typing.Optional[bpy.types.Context] = None) -> Prefe
         context = bpy.context
 
     return context.preferences.addons[__package__].preferences
-    
+
 
 def get_geonodes_path() -> str:
     return os.path.abspath(GEONODES_PATH)
@@ -233,7 +232,7 @@ def ensure_viewer_nodes_loaded(link: bool = True):
             if node_group_name not in bpy.data.node_groups:
                 assert node_group_name in data_from.node_groups
                 data_to.node_groups.append(node_group_name)
-                
+
 
 def filter_applicable_sockets(
     node_outputs: typing.Iterable[bpy.types.NodeSocket]
@@ -249,7 +248,7 @@ def filter_applicable_sockets(
 def is_viewer_node(node: bpy.types.Node) -> bool:
     if not isinstance(node, bpy.types.GeometryNodeGroup):
         return False
-    
+
     assert hasattr(node, "node_tree")
     if node.node_tree is None:
         return False
@@ -258,23 +257,23 @@ def is_viewer_node(node: bpy.types.Node) -> bool:
 
 
 def is_socket_connected_to_viewer(
-    node_tree: bpy.types.NodeTree, 
+    node_tree: bpy.types.NodeTree,
     from_socket: bpy.types.NodeSocket,
     check_geometry_socket: bool = False
 ) -> bool:
     """Returns True if 'from_socket' is already connected to 'Attribute' socket of viewer
-    
+
     If 'check_geometry_socket' is True, then also 'Geometry' named socket is considered
     as valid connection.
     """
     to_socket_names = ("Attribute", "Geometry") if check_geometry_socket else ("Attribute")
     for link in node_tree.links:
         if link.from_socket == from_socket and \
-            is_viewer_node(link.to_node) and \
-            link.to_socket.name in to_socket_names:
+                is_viewer_node(link.to_node) and \
+                link.to_socket.name in to_socket_names:
             return True
 
-    return False   
+    return False
 
 
 def find_attribute_viewer_nodes_for_socket(
@@ -349,7 +348,7 @@ def get_auto_attribute_viewer(
     attribute_viewers = [
         v for v in find_attribute_viewer_nodes_for_socket(node_tree, socket) if is_auto_viewer(v)]
     if not reuse_nodes or len(attribute_viewers) == 0:
-        node_group = new_attribute_viewer_from_socket_type(node_tree, type(socket)) 
+        node_group = new_attribute_viewer_from_socket_type(node_tree, type(socket))
         is_new = True
     else:
         node_group = attribute_viewers[0]
@@ -363,14 +362,14 @@ def get_first_geometry_output(
     for socket in node.outputs:
         if isinstance(socket, bpy.types.NodeSocketGeometry):
             return socket
-    
+
     return None
 
 
 def safe_get_active_object(context: bpy.types.Context) -> typing.Optional[bpy.types.Object]:
     if not hasattr(context, "active_object"):
         return None
-    
+
     return context.active_object
 
 
@@ -383,9 +382,9 @@ def adjust_viewer_text_size(
         size_factor = 1.0
 
     # No autoscale for unapplied scale
-    if not (math.isclose(obj.scale.x, 1.0) and \
-        math.isclose(obj.scale.y, 1.0) and \
-        math.isclose(obj.scale.z, 1.0)):
+    if not (math.isclose(obj.scale.x, 1.0) and
+            math.isclose(obj.scale.y, 1.0) and
+            math.isclose(obj.scale.z, 1.0)):
         return
 
     text_size = size_factor * GLOBAL_SCALE_FACTOR
@@ -398,8 +397,8 @@ def mouse_to_region_coords(
     event: bpy.types.Event
 ) -> typing.Tuple[float, float]:
 
-    region = context.region.view2d  
-    ui_scale = context.preferences.system.ui_scale     
+    region = context.region.view2d
+    ui_scale = context.preferences.system.ui_scale
     x, y = region.region_to_view(event.mouse_region_x, event.mouse_region_y)
     return (x / ui_scale, y / ui_scale)
 
@@ -434,7 +433,7 @@ class AV_ViewAttribute(GeoNodesEditorOnlyMixin, bpy.types.Operator):
                 if is_socket_connected_to_viewer(node_tree, socket_to_view):
                     viewer_connected_idx = i
                     break
-            
+
             geometry_socket = get_first_geometry_output(active_node)
             # Attribute viewer is connected to socket, but also has geometry socket that
             # could be connected and isn't
@@ -456,7 +455,7 @@ class AV_ViewAttribute(GeoNodesEditorOnlyMixin, bpy.types.Operator):
             prev_geometry_socket = None
             for link in list(node_tree.links):
                 if is_viewer_node(link.to_node) and \
-                    isinstance(link.to_socket, bpy.types.NodeSocketGeometry):
+                        isinstance(link.to_socket, bpy.types.NodeSocketGeometry):
                     prev_geometry_socket = link.from_socket
                     break
 
@@ -470,9 +469,9 @@ class AV_ViewAttribute(GeoNodesEditorOnlyMixin, bpy.types.Operator):
 
             for node in list(node_tree.nodes):
                 if is_viewer_node(node) and \
-                    is_auto_viewer(node) and \
-                    not isinstance(node.inputs[1], type(socket_to_view)):
-                    node_tree.nodes.remove(node)        
+                        is_auto_viewer(node) and \
+                        not isinstance(node.inputs[1], type(socket_to_view)):
+                    node_tree.nodes.remove(node)
 
             socket_to_view = viewable_sockets[idx]
             is_new, attribute_viewer = get_auto_attribute_viewer(node_tree, socket_to_view)
@@ -484,8 +483,8 @@ class AV_ViewAttribute(GeoNodesEditorOnlyMixin, bpy.types.Operator):
             if prev_viewer_location:
                 attribute_viewer.location = prev_viewer_location
             elif is_new:
-                attribute_viewer.location = (active_node.location.x + 400, active_node.location.y) 
-                            
+                attribute_viewer.location = (active_node.location.x + 400, active_node.location.y)
+
             # Connect attribute viewer to output
             output_node = None
             for node in node_tree.nodes:
@@ -494,17 +493,16 @@ class AV_ViewAttribute(GeoNodesEditorOnlyMixin, bpy.types.Operator):
 
                 output_node = node
                 break
-            
 
             if output_node is not None:
                 output_geo_socket = None
                 for socket in output_node.inputs:
                     if not isinstance(socket, bpy.types.NodeSocketGeometry):
                         continue
-                    
+
                     output_geo_socket = socket
                     break
-                
+
                 join_geo_node = None
                 for link in node_tree.links:
                     if not isinstance(link.from_node, bpy.types.GeometryNodeJoinGeometry):
@@ -513,11 +511,11 @@ class AV_ViewAttribute(GeoNodesEditorOnlyMixin, bpy.types.Operator):
                     if link.to_socket == output_geo_socket:
                         join_geo_node = link.from_node
                         break
-                
+
                 if join_geo_node is None:
                     join_geo_node = node_tree.nodes.new('GeometryNodeJoinGeometry')
-                    join_geo_node.location = (output_node.location.x - 300, output_node.location.y) 
-                
+                    join_geo_node.location = (output_node.location.x - 300, output_node.location.y)
+
                     for link in node_tree.links:
                         if link.to_socket == output_geo_socket:
                             node_tree.links.new(join_geo_node.inputs[0], link.from_socket)
@@ -527,11 +525,11 @@ class AV_ViewAttribute(GeoNodesEditorOnlyMixin, bpy.types.Operator):
                 for link in node_tree.links:
                     if link.to_node == join_geo_node and link.from_node == attribute_viewer:
                         found_link = link
-                        break 
-                
+                        break
+
                 if found_link is None:
                     node_tree.links.new(join_geo_node.inputs[0], attribute_viewer.outputs[0])
-                
+
                 node_tree.links.new(join_geo_node.outputs[0], output_geo_socket)
 
             if context.active_object is not None:
@@ -539,7 +537,7 @@ class AV_ViewAttribute(GeoNodesEditorOnlyMixin, bpy.types.Operator):
                     safe_get_active_object(context),
                     attribute_viewer
                 )
-        
+
         return {'FINISHED'}
 
 
@@ -552,7 +550,8 @@ class AV_RemoveViewer(GeoNodesEditorOnlyMixin, bpy.types.Operator):
 
     def draw(self, context: bpy.types.Context):
         layout = self.layout
-        layout.label(text=f"Going to remove ({len(AV_RemoveViewer.nodes_to_remove)}) viewers "
+        layout.label(
+            text=f"Going to remove ({len(AV_RemoveViewer.nodes_to_remove)}) viewers "
             f"and ({len(AV_RemoveViewer.links_to_remove)}) links, OK?"
         )
 
@@ -561,7 +560,7 @@ class AV_RemoveViewer(GeoNodesEditorOnlyMixin, bpy.types.Operator):
         node_tree = space.node_tree
         AV_RemoveViewer.nodes_to_remove.clear()
         AV_RemoveViewer.links_to_remove.clear()
-        
+
         if ('FINISHED' in bpy.ops.node.select(location=(event.mouse_x, event.mouse_y))):
             active_node = node_tree.nodes.active
             viewer_connected_sockets = set()
@@ -576,17 +575,17 @@ class AV_RemoveViewer(GeoNodesEditorOnlyMixin, bpy.types.Operator):
 
             # Don't invoke prompt if there is simple case that is obvious
             if len(AV_RemoveViewer.nodes_to_remove) == 1 and \
-                len(AV_RemoveViewer.nodes_to_remove) <= 2:
+                    len(AV_RemoveViewer.nodes_to_remove) <= 2:
                 for link in self.links_to_remove:
                     node_tree.links.remove(link)
 
                 for node in self.nodes_to_remove:
                     node_tree.nodes.remove(node)
-                
+
                 return {'FINISHED'}
-            
+
             if len(AV_RemoveViewer.nodes_to_remove) == 0 and \
-                len(AV_RemoveViewer.links_to_remove) == 0:
+                    len(AV_RemoveViewer.links_to_remove) == 0:
                 return {'FINISHED'}
 
             return context.window_manager.invoke_props_dialog(self)
@@ -685,7 +684,7 @@ class AV_QuickView(GeoNodesEditorOnlyMixin, bpy.types.Operator):
 class AV_AttributeMenu(GeoNodesEditorOnlyMixin, bpy.types.Menu):
     bl_idname = "NODE_MT_attribute_viewer_attribute_menu"
     bl_label = "Add Viewer"
-    
+
     def draw(self, context: bpy.types.Context):
         layout = self.layout
         for type_, readable, _ in AV_AddViewer.get_viewer_enum_items():
@@ -701,7 +700,7 @@ def add_viewer_menu_func(self, context: bpy.types.Context) -> None:
 class AV_MainMenu(GeoNodesEditorOnlyMixin, bpy.types.Menu):
     bl_idname = "NODE_MT_attribute_viewer_main_menu"
     bl_label = "Attribute Viewer"
-    
+
     def draw(self, context: bpy.types.Context):
         layout = self.layout
         layout.operator_context = 'INVOKE_DEFAULT'
@@ -738,14 +737,14 @@ def register_keymaps():
     kc = bpy.context.window_manager.keyconfigs.addon
     if not kc:
         return
-    
+
     keymap = kc.keymaps.new(name='Node Editor', space_type='NODE_EDITOR')
     for op, key, event, ctrl, shift, alt, props in KEYMAP_DEFINITIONS:
         keymap_item = keymap.keymap_items.new(op, key, event, ctrl=ctrl, shift=shift, alt=alt)
         if len(props) > 0:
             for prop, value in props.items():
                 setattr(keymap_item.properties, prop, value)
-    
+
         REGISTERED_KEYMAPS.append((keymap, keymap_item))
 
 
@@ -766,5 +765,5 @@ def unregister():
 
     for keymap, keymap_item in REGISTERED_KEYMAPS:
         keymap.keymap_items.remove(keymap_item)
-    
+
     REGISTERED_KEYMAPS.clear()
