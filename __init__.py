@@ -707,17 +707,6 @@ class AV_MainMenu(GeoNodesEditorOnlyMixin, bpy.types.Menu):
         layout.operator(AV_RemoveAllViewers.bl_idname)
 
 
-class AV_Panel(GeoNodesEditorOnlyMixin, bpy.types.Panel):
-    bl_idname = "NODE_PT_attribute_viewer"
-    bl_label = "Attribute Viewer"
-    bl_space_type = 'NODE_EDITOR'
-    bl_region_type = 'UI'
-    bl_category = "Attribute Viewer"
-
-    def draw(self, context: bpy.types.Context):
-        AV_MainMenu.draw(self, context)
-
-
 # TODO: Change keymaps to not interfere with node wrangler :)
 KEYMAP_DEFINITIONS = (
     (AV_ViewAttribute.bl_idname, 'MIDDLEMOUSE', 'PRESS', True, True, False, {}),
@@ -732,8 +721,6 @@ CLASSES = [
     AV_AddViewer,
     AV_RemoveViewer,
     AV_RemoveAllViewers,
-    # Panels
-    AV_Panel,
     # Menu
     AV_AttributeMenu,
     AV_MainMenu,
