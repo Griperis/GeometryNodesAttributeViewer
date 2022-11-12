@@ -329,8 +329,9 @@ def new_attribute_viewer_from_name(
 
 
 def mark_auto_viewer(node: bpy.types.NodeCustomGroup) -> None:
-    node.label = "[AUTO] " + node.label
-    node[AUTO_VIEW_CUSTOM_PROP] = True
+    if node.get(AUTO_VIEW_CUSTOM_PROP, None) is None:
+        node.label = "[AUTO] " + node.label
+        node[AUTO_VIEW_CUSTOM_PROP] = True
 
 
 def is_auto_viewer(node: bpy.types.NodeCustomGroup) -> bool:
@@ -468,8 +469,10 @@ class AV_ViewAttribute(GeoNodesEditorOnlyMixin, bpy.types.Operator):
                     node_tree.links.remove(link)
 
             for node in list(node_tree.nodes):
-                if is_viewer_node(node) and is_auto_viewer(node):
-                        node_tree.nodes.remove(node)
+                if is_viewer_node(node) and \
+                    is_auto_viewer(node) and \
+                    not isinstance(node.inputs[1], type(socket_to_view)):
+                    node_tree.nodes.remove(node)        
 
             socket_to_view = viewable_sockets[idx]
             is_new, attribute_viewer = get_auto_attribute_viewer(node_tree, socket_to_view)
