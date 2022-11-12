@@ -40,6 +40,8 @@ VIEWER_NAMES = {
 
 # How to scale text when it is spawned (so it looks somewhat good)
 GLOBAL_SCALE_FACTOR = 0.1
+# Custom property marked as True on node if the node is automatic viewer
+AUTO_VIEW_CUSTOM_PROP = "AV_Auto"
 
 
 def get_readable_viewer_name(name: str):
@@ -326,7 +328,16 @@ def new_attribute_viewer_from_name(
     return node
 
 
-def get_attribute_viewer(
+def mark_auto_viewer(node: bpy.types.NodeCustomGroup) -> None:
+    node.label = "[AUTO] " + node.label
+    node[AUTO_VIEW_CUSTOM_PROP] = True
+
+
+def is_auto_viewer(node: bpy.types.NodeCustomGroup) -> bool:
+    return node.get(AUTO_VIEW_CUSTOM_PROP, False)
+
+
+def get_auto_attribute_viewer(
     node_tree: bpy.types.NodeTree,
     socket: bpy.types.NodeSocket,
     reuse_nodes: bool = True
@@ -334,7 +345,8 @@ def get_attribute_viewer(
     # Connects 'socket' from 'node' in 'node_tree' to viewer node
     # and connects the viewer to output
     is_new = False
-    attribute_viewers = find_attribute_viewer_nodes_for_socket(node_tree, socket)
+    attribute_viewers = [
+        v for v in find_attribute_viewer_nodes_for_socket(node_tree, socket) if is_auto_viewer(v)]
     if not reuse_nodes or len(attribute_viewers) == 0:
         node_group = new_attribute_viewer_from_socket_type(node_tree, type(socket)) 
         is_new = True
@@ -451,14 +463,17 @@ class AV_ViewAttribute(GeoNodesEditorOnlyMixin, bpy.types.Operator):
             prev_viewer_location = None
             for link in list(node_tree.links):
                 to_node = link.to_node
-                if link.from_socket in viewable_sockets and is_viewer_node(to_node):
+                if link.from_socket in viewable_sockets and is_auto_viewer(to_node):
                     prev_viewer_location = to_node.location
                     node_tree.links.remove(link)
-                    # Also remove other viewers
-                    node_tree.nodes.remove(to_node)
+
+            for node in list(node_tree.nodes):
+                if is_viewer_node(node) and is_auto_viewer(node):
+                        node_tree.nodes.remove(node)
 
             socket_to_view = viewable_sockets[idx]
-            is_new, attribute_viewer = get_attribute_viewer(node_tree, socket_to_view)
+            is_new, attribute_viewer = get_auto_attribute_viewer(node_tree, socket_to_view)
+            mark_auto_viewer(attribute_viewer)
             if prev_geometry_socket:
                 node_tree.links.new(prev_geometry_socket, attribute_viewer.inputs[0])
             node_tree.links.new(socket_to_view, attribute_viewer.inputs[1])
