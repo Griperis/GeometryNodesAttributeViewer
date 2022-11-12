@@ -209,6 +209,7 @@ class Preferences(bpy.types.AddonPreferences):
             "base",
             "scale",
             "color",
+            "offset",
             "offset_along_normals",
             "viewport_only",
             "show_geometry"
