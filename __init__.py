@@ -30,12 +30,12 @@ GEONODES_PATH = os.path.join("data", "attribute_viewer_nodes.blend")
 # If there are more than one viewer for one type, then the default spawned one should be
 # selectable from preferences.
 VIEWER_NAMES = {
-    "AV_Float-Value_AttributeViewer": bpy.types.NodeSocketFloat,
-    "AV_Int-Value_AttributeViewer": bpy.types.NodeSocketInt,
-    "AV_Vector-Value_AttributeViewer": bpy.types.NodeSocketVector,
-    "AV_Vector_AttributeViewer": bpy.types.NodeSocketVector,
-    "AV_Color-Value_AttributeViewer": bpy.types.NodeSocketColor,
-    "AV_Color_AttributeViewer": bpy.types.NodeSocketColor,
+    "AV_Float-Value": bpy.types.NodeSocketFloat,
+    "AV_Integer-Value": bpy.types.NodeSocketInt,
+    "AV_Vector-Value": bpy.types.NodeSocketVector,
+    "AV_Vector": bpy.types.NodeSocketVector,
+    "AV_Color-Value": bpy.types.NodeSocketColor,
+    "AV_Color": bpy.types.NodeSocketColor,
 }
 
 # How to scale text when it is spawned (so it looks somewhat good)
@@ -44,8 +44,8 @@ GLOBAL_SCALE_FACTOR = 0.1
 
 def get_readable_viewer_name(name: str):
     split = name.split("_")
-    if len(split) == 3:
-        _, middle, _ = name.split("_")
+    if len(split) == 2:
+        _, middle = name.split("_")
         return middle.replace("-", " ")        
 
     return name
