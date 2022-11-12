@@ -460,11 +460,11 @@ class AV_ViewAttribute(GeoNodesEditorOnlyMixin, bpy.types.Operator):
                     break
 
             # Disconnect other sockets going to viewer and connect this one
-            prev_viewer_location = None
+            prev_viewer = None
             for link in list(node_tree.links):
                 to_node = link.to_node
                 if link.from_socket in viewable_sockets and is_auto_viewer(to_node):
-                    prev_viewer_location = to_node.location
+                    prev_viewer = to_node
                     node_tree.links.remove(link)
 
             for node in list(node_tree.nodes):
@@ -480,8 +480,9 @@ class AV_ViewAttribute(GeoNodesEditorOnlyMixin, bpy.types.Operator):
                 node_tree.links.new(prev_geometry_socket, attribute_viewer.inputs[0])
             node_tree.links.new(socket_to_view, attribute_viewer.inputs[1])
 
-            if prev_viewer_location:
-                attribute_viewer.location = prev_viewer_location
+            if prev_viewer:
+                attribute_viewer.location = prev_viewer.location
+                node_tree.nodes.remove(prev_viewer)
             elif is_new:
                 attribute_viewer.location = (active_node.location.x + 400, active_node.location.y)
 
