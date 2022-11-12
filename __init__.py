@@ -680,7 +680,13 @@ class AV_AttributeMenu(GeoNodesEditorOnlyMixin, bpy.types.Menu):
     def draw(self, context: bpy.types.Context):
         layout = self.layout
         for type_, readable, _ in AV_AddViewer.get_viewer_enum_items():
-            layout.operator(AV_AddViewer.bl_idname, text=readable).viewer_type = type_
+            layout.operator(AV_AddViewer.bl_idname, text="View " + readable).viewer_type = type_
+
+
+def add_viewer_menu_func(self, context: bpy.types.Context) -> None:
+    layout: bpy.types.UILayout = self.layout
+    layout.separator()
+    layout.menu(AV_AttributeMenu.bl_idname, text="View", icon='BORDERMOVE')
 
 
 class AV_MainMenu(GeoNodesEditorOnlyMixin, bpy.types.Menu):
@@ -692,7 +698,7 @@ class AV_MainMenu(GeoNodesEditorOnlyMixin, bpy.types.Menu):
         layout.operator_context = 'INVOKE_DEFAULT'
         layout.menu(AV_AttributeMenu.bl_idname, icon='ADD')
         layout.separator()
-        layout.operator(AV_RemoveAllViewers.bl_idname, icon='PANEL_CLOSE')
+        layout.operator(AV_RemoveAllViewers.bl_idname)
 
 
 class AV_Panel(GeoNodesEditorOnlyMixin, bpy.types.Panel):
@@ -753,8 +759,12 @@ def register():
 
     register_keymaps()
 
+    bpy.types.NODE_MT_add.append(add_viewer_menu_func)
+
 
 def unregister():
+    bpy.types.NODE_MT_add.remove(add_viewer_menu_func)
+
     for cls in reversed(CLASSES):
         bpy.utils.unregister_class(cls)
 
