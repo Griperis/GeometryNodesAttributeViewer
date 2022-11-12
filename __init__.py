@@ -50,11 +50,6 @@ def get_readable_viewer_name(name: str):
 class Preferences(bpy.types.AddonPreferences):
     bl_idname = __package__
     
-    digits: bpy.props.IntProperty(
-        name="Digits",
-        default=6,
-        min=0
-    )
     decimals: bpy.props.IntProperty(
         name="Decimals",
         default=1,
@@ -167,7 +162,6 @@ class Preferences(bpy.types.AddonPreferences):
             row = col.row()
             row.enabled = False
             row.label(text="Numbers")
-            col.prop(self, "digits")
             col.prop(self, "decimals")
             col.prop(self, "base")
             col.separator()
@@ -194,7 +188,6 @@ class Preferences(bpy.types.AddonPreferences):
     @property
     def customizable_prop_defaults(self):
         return [
-            "digits",
             "decimals",
             "base",
             "scale",
