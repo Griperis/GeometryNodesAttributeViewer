@@ -228,13 +228,8 @@ def get_geonodes_path() -> str:
 def ensure_viewer_nodes_loaded(link: bool = True):
     with bpy.data.libraries.load(get_geonodes_path(), link=link) as (data_from, data_to):
         for node_group_name in VIEWER_NAMES:
-            if node_group_name in bpy.data.node_groups:
-                # TODO: if linked and from library, then refresh
-                # if not linked, then link and use the linked one to
-                ...
-            else:
-                assert node_group_name in data_from.node_groups
-                data_to.node_groups.append(node_group_name)
+            assert node_group_name in data_from.node_groups
+            data_to.node_groups.append(node_group_name)
                 
 
 def filter_applicable_sockets(
