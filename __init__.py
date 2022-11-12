@@ -12,8 +12,8 @@ bl_info = {
     "name": "Attribute Viewer",
     "author": "Zdenek Dolezal",
     "version": (1, 0, 0),
-    "blender": (3, 3, 0),
-    "location": "Node Editor N-panel or Ctrl-Shift-W",
+    "blender": (3, 2, 0),
+    "location": "View category under 'Add Nodes' menu or Ctrl-Shift-W",
     "description": "",
     "category": "Node",
 }
@@ -158,7 +158,7 @@ class Preferences(bpy.types.AddonPreferences):
     def draw(self, context: bpy.types.Context) -> None:
         layout: bpy.types.UILayout = self.layout
         row = layout.row()
-        row.label(text="Default Viewers", icon='COMMUNITY')
+        row.label(text="Default Viewers")
         row = row.row()
         row.enabled = False
         row.alignment = 'LEFT'
