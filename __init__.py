@@ -509,12 +509,13 @@ class AV_ViewAttribute(GeoNodesEditorOnlyMixin, bpy.types.Operator):
                         join_geo_node = node_tree.nodes.new('GeometryNodeJoinGeometry')
                         join_geo_node.location = (output_node.location.x - 300, output_node.location.y) 
                     
-                        for link in list(node_tree.links):
+                        for link in node_tree.links:
                             if link.to_socket == output_geo_socket:
                                 node_tree.links.new(join_geo_node.inputs[0], link.from_socket)
+                                break
 
                     found_link = None
-                    for link in list(node_tree.links):
+                    for link in node_tree.links:
                         if link.to_node == join_geo_node and link.from_node == attribute_viewer:
                             found_link = link
                             break 
