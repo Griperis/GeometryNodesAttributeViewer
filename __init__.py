@@ -39,7 +39,7 @@ VIEWER_NAMES = {
 }
 
 # How to scale text when it is spawned (so it looks somewhat good)
-GLOBAL_SCALE_FACTOR = 0.1
+GLOBAL_SCALE_FACTOR = 0.05
 # Custom property marked as True on node if the node is automatic viewer
 AUTO_VIEW_CUSTOM_PROP = "AV_Auto"
 
@@ -102,7 +102,7 @@ class Preferences(bpy.types.AddonPreferences):
     offset: bpy.props.FloatVectorProperty(
         name="Offset",
         size=3,
-        default=(0.0, 0.0, 0.0)
+        default=(0.0, 0.0, 0.1)
     )
 
     viewport_only: bpy.props.BoolProperty(
@@ -207,7 +207,6 @@ class Preferences(bpy.types.AddonPreferences):
         return [
             "decimals",
             "base",
-            "scale",
             "color",
             "offset",
             "offset_along_normals",
@@ -388,7 +387,7 @@ def adjust_viewer_text_size(
             math.isclose(obj.scale.z, 1.0)):
         return
 
-    text_size = size_factor * GLOBAL_SCALE_FACTOR
+    text_size = size_factor * GLOBAL_SCALE_FACTOR * get_preferences().scale
     input: bpy.types.NodeSocketFloat = viewer.inputs.get("Scale")
     input.default_value = text_size
 
