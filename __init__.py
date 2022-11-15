@@ -39,7 +39,7 @@ VIEWER_NAMES = {
 }
 
 # How to scale text when it is spawned (so it looks somewhat good)
-GLOBAL_SCALE_FACTOR = 0.05
+GLOBAL_SCALE_FACTOR = 0.025
 # Custom property marked as True on node if the node is automatic viewer
 AUTO_VIEW_CUSTOM_PROP = "AV_Auto"
 
@@ -83,7 +83,7 @@ class Preferences(bpy.types.AddonPreferences):
     )
 
     scale: bpy.props.FloatProperty(
-        name="Text Scale",
+        name="Text Scale Multiplier",
         default=1,
         min=0
     )
@@ -139,13 +139,21 @@ class Preferences(bpy.types.AddonPreferences):
     default_color_viewer: bpy.props.EnumProperty(
         name="Default Color Viewer",
         description="What 'Color Viewer' to spawn when using 'ViewAttribute' operator",
-        items=lambda self, _: self.get_default_viewer_enum_items(bpy.types.NodeSocketColor)
+        items=lambda self, _: self.get_default_viewer_enum_items(bpy.types.NodeSocketColor),
+        default=1,
     )
 
     default_vector_viewer: bpy.props.EnumProperty(
         name="Default Vector Viewer",
         description="What 'Vector Viewer' to spawn when using 'ViewAttribute' operator",
-        items=lambda self, _: self.get_default_viewer_enum_items(bpy.types.NodeSocketVector)
+        items=lambda self, _: self.get_default_viewer_enum_items(bpy.types.NodeSocketVector),
+        default=1,
+    )
+
+    dimensions_scaling: bpy.props.BoolProperty(
+        name="Dimensions Based Scaling",
+        description="If toggled then text scale is set based on maximum dimension of object",
+        default=True
     )
 
     def get_default_viewer_enum_items(self, socket_type: typing.Type[bpy.types.NodeSocket]):
@@ -184,6 +192,10 @@ class Preferences(bpy.types.AddonPreferences):
         col.prop(self, "default_vector_viewer")
         col.prop(self, "default_color_viewer")
 
+        col = layout.column()
+        col.prop(self, "dimensions_scaling")
+        col.prop(self, "scale")
+
         row = layout.row(align=True)
         icon = 'TRIA_RIGHT' if self.collapse_default_settings else 'TRIA_DOWN'
         row.prop(self, "collapse_default_settings", icon_only=True, icon=icon, emboss=False)
@@ -204,7 +216,6 @@ class Preferences(bpy.types.AddonPreferences):
             row = col.row()
             row.enabled = False
             row.label(text="Appearance")
-            col.prop(self, "scale")
             col.prop(self, "color")
             col.separator()
             col.prop(self, "offset_along_normals")
@@ -224,7 +235,7 @@ class Preferences(bpy.types.AddonPreferences):
     def apply_defaults(self, node: bpy.types.GeometryNodeGroup) -> None:
         for prop_name, expected_input in self.customizable_props_map.items():
             for input_ in node.inputs:
-                if expected_input == input_.name.lower():
+                if expected_input.lower() == input_.name.lower():
                     input_.default_value = getattr(self, prop_name)
                     break
 
@@ -410,12 +421,15 @@ def adjust_viewer_text_size(
     obj: typing.Optional[bpy.types.Object],
     viewer: bpy.types.GeometryNodeGroup
 ):
-    size_factor = max(obj.dimensions)
+    size_factor = 1.0
+    if get_preferences(bpy.context).dimensions_scaling and obj is not None:
+        size_factor = max(obj.dimensions)
+    
     if obj is None or math.isclose(size_factor, 0.0) or size_factor < 0:
         size_factor = 1.0
 
     # No autoscale for unapplied scale
-    if not (math.isclose(obj.scale.x, 1.0) and
+    if obj is not None and not (math.isclose(obj.scale.x, 1.0) and
             math.isclose(obj.scale.y, 1.0) and
             math.isclose(obj.scale.z, 1.0)):
         return
