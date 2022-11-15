@@ -39,7 +39,7 @@ VIEWER_NAMES = {
 }
 
 # How to scale text when it is spawned (so it looks somewhat good)
-GLOBAL_SCALE_FACTOR = 0.025
+GLOBAL_SCALE_FACTOR = 0.075
 # Custom property marked as True on node if the node is automatic viewer
 AUTO_VIEW_CUSTOM_PROP = "AV_Auto"
 
