@@ -434,6 +434,10 @@ def adjust_viewer_text_size(
             math.isclose(obj.scale.z, 1.0)):
         return
 
+    # Default size is larger for the vector, so it looks nicer
+    if viewer.node_tree.name == "AV_Vector":
+        size_factor *= 3.0
+
     text_size = size_factor * GLOBAL_SCALE_FACTOR * get_preferences().scale
     input: bpy.types.NodeSocketFloat = viewer.inputs.get("Scale")
     input.default_value = text_size
