@@ -513,7 +513,7 @@ class AV_ViewAttribute(GeoNodesEditorOnlyMixin, bpy.types.Operator):
                 node_tree.links.new(prev_geometry_socket, attribute_viewer.inputs[0])
             node_tree.links.new(socket_to_view, attribute_viewer.inputs[1])
 
-            if prev_viewer:
+            if prev_viewer and is_new:
                 attribute_viewer.location = prev_viewer.location
                 node_tree.nodes.remove(prev_viewer)
             elif is_new:
