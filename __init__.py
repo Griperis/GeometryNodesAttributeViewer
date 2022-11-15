@@ -116,6 +116,24 @@ class Preferences(bpy.types.AddonPreferences):
         default=True
     )
 
+    vec_line_or_arrow: bpy.props.BoolProperty(
+        name="Line / Arrow",
+        description="Show line or arrow for each vector",
+        default=True
+    )
+
+    vec_val_rgb: bpy.props.BoolProperty(
+        name="Use RGB for XYZ",
+        description="If toggled, RGB colors are going to be used for individual value components",
+        default=True
+    )
+
+    color_val_rgbw: bpy.props.BoolProperty(
+        name="Use RGBW fo RGBA",
+        description="If toggled RGBW colors are used for individual color components",
+        default=True
+    )
+
     collapse_default_settings: bpy.props.BoolProperty()
 
     default_color_viewer: bpy.props.EnumProperty(
@@ -195,16 +213,25 @@ class Preferences(bpy.types.AddonPreferences):
             col.prop(self, "viewport_only")
             col.prop(self, "show_geometry")
 
+            col = layout.column()
+            row = col.row()
+            row.enabled = False
+            row.label(text="Viewer specific properties")
+            col.prop(self, "vec_line_or_arrow")
+            col.prop(self, "vec_val_rgb")
+            col.prop(self, "color_val_rgbw")
+
     def apply_defaults(self, node: bpy.types.GeometryNodeGroup) -> None:
-        for prop_name in self.customizable_prop_defaults:
+        for prop_name, expected_input in self.customizable_props_map.items():
             for input_ in node.inputs:
-                if prop_name == input_.name.lower():
+                if expected_input == input_.name.lower():
                     input_.default_value = getattr(self, prop_name)
                     break
 
     @property
-    def customizable_prop_defaults(self):
-        return [
+    def customizable_props_map(self) -> typing.Dict[str, str]:
+        # properties whose input has the same name as the property in prefs 
+        self_named_props = [
             "decimals",
             "base",
             "color",
@@ -213,6 +240,12 @@ class Preferences(bpy.types.AddonPreferences):
             "viewport_only",
             "show_geometry"
         ]
+        return {
+            "vec_line_or_arrow": "Line / Arrow",
+            "vec_val_rgb": "Use RGB for XYZ",
+            "color_val_rgbw": "Use RGBW for RGBA",
+            **{p:p.replace("_", " ") for p in self_named_props}
+        }
 
 
 def get_preferences(context: typing.Optional[bpy.types.Context] = None) -> Preferences:
