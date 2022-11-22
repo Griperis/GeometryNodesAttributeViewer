@@ -128,6 +128,12 @@ class Preferences(bpy.types.AddonPreferences):
         default=True
     )
 
+    vec_override_scale: bpy.props.BoolProperty(
+        name="Override Scale",
+        description="Override vector's scale by float number",
+        default=False
+    )
+
     color_val_rgbw: bpy.props.BoolProperty(
         name="Use RGBW fo RGBA",
         description="If toggled RGBW colors are used for individual color components",
@@ -230,6 +236,7 @@ class Preferences(bpy.types.AddonPreferences):
             row.label(text="Viewer specific properties")
             col.prop(self, "vec_line_or_arrow")
             col.prop(self, "vec_val_rgb")
+            col.prop(self, "vec_override_scale")
             col.prop(self, "color_val_rgbw")
 
     def apply_defaults(self, node: bpy.types.GeometryNodeGroup) -> None:
@@ -253,6 +260,7 @@ class Preferences(bpy.types.AddonPreferences):
         ]
         return {
             "vec_line_or_arrow": "Line / Arrow",
+            "vec_override_scale": "Override Scale",
             "vec_val_rgb": "Use RGB for XYZ",
             "color_val_rgbw": "Use RGBW for RGBA",
             **{p:p.replace("_", " ") for p in self_named_props}
