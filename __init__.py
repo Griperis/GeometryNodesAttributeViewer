@@ -611,11 +611,12 @@ class AV_RemoveViewer(GeoNodesEditorOnlyMixin, bpy.types.Operator):
 
     nodes_to_remove = set()
     links_to_remove = set()
+    reconnections: typing.Set[typing.Tuple[bpy.types.NodeSocket, bpy.types.NodeSocket]] = set()
 
     def draw(self, context: bpy.types.Context):
         layout = self.layout
         layout.label(
-            text=f"Going to remove ({len(AV_RemoveViewer.nodes_to_remove)}) viewers "
+            text=f"Going to remove ({len(AV_RemoveViewer.__get_viewers_to_remove())}) viewers "
             f"and ({len(AV_RemoveViewer.links_to_remove)}) links, OK?"
         )
 
@@ -624,6 +625,7 @@ class AV_RemoveViewer(GeoNodesEditorOnlyMixin, bpy.types.Operator):
         node_tree = space.node_tree
         AV_RemoveViewer.nodes_to_remove.clear()
         AV_RemoveViewer.links_to_remove.clear()
+        AV_RemoveViewer.reconnections.clear()
 
         if ('FINISHED' in bpy.ops.node.select(location=(event.mouse_x, event.mouse_y))):
             active_node = node_tree.nodes.active
@@ -632,7 +634,17 @@ class AV_RemoveViewer(GeoNodesEditorOnlyMixin, bpy.types.Operator):
                 if is_socket_connected_to_viewer(node_tree, socket, check_geometry_socket=True):
                     viewer_connected_sockets.add(socket)
 
-            jg_nodes: typing.Dict[bpy.types.Node, typing.Set[bpy.types.NodeLink]] = {}
+            if len(viewer_connected_sockets) == 0:
+                return {'FINISHED'}
+
+            jg_nodes: typing.Dict[
+                bpy.types.Node,
+                typing.Tuple[
+                    typing.Set[bpy.types.NodeLink],
+                    typing.Set[bpy.types.NodeLink]
+                ]
+            ] = {}
+
             for link in node_tree.links:
                 if link.from_socket in viewer_connected_sockets and is_viewer_node(link.to_node):
                     AV_RemoveViewer.nodes_to_remove.add(link.to_node)
@@ -641,30 +653,43 @@ class AV_RemoveViewer(GeoNodesEditorOnlyMixin, bpy.types.Operator):
                 # Remove join geometry node that's connected only to viewers
                 if isinstance(link.to_node, bpy.types.GeometryNodeJoinGeometry) and \
                      is_viewer_node(link.from_node):
-                    jg_nodes[link.to_node] = set()
+                    jg_nodes[link.to_node] = (set(), set())
 
             for link in node_tree.links:
                 if link.to_node in jg_nodes:
-                    jg_nodes[link.to_node].add(link)
+                    jg_nodes[link.to_node][0].add(link)
+                
+                if link.from_node in jg_nodes:
+                    jg_nodes[link.from_node][1].add(link)
 
-            for jg_node, links in jg_nodes.items():
-                if all([is_viewer_node(l.from_node) for l in links]):
-                    AV_RemoveViewer.links_to_remove.update(links)
+            for jg_node, (incoming_links, outgoing_links) in jg_nodes.items():
+                incoming_links = list(incoming_links)
+                outgoing_links = list(outgoing_links)
+                viewer_connections = [l for l in incoming_links if is_viewer_node(l.from_node)]
+
+                if len(incoming_links) - len(viewer_connections) > 1:
+                    AV_RemoveViewer.links_to_remove.update(viewer_connections)    
+
+                if len(incoming_links) == 1 and len(viewer_connections) == 1:
                     AV_RemoveViewer.nodes_to_remove.add(jg_node)
+                else:
+                    if len(incoming_links) == 2 and len(outgoing_links) == 1:
+                        if is_viewer_node(incoming_links[0].from_node):
+                            from_socket = incoming_links[1].from_socket
+                        else:
+                            from_socket = incoming_links[0].from_socket
+                        AV_RemoveViewer.reconnections.add((from_socket, outgoing_links[0].to_socket))
+                        AV_RemoveViewer.nodes_to_remove.add(jg_node)
             
             # Don't invoke prompt if there is simple case that is obvious
-            if len(AV_RemoveViewer.nodes_to_remove) <= 2 and \
-                    len(AV_RemoveViewer.links_to_remove) <= 2:
-                for link in self.links_to_remove:
-                    node_tree.links.remove(link)
-
-                for node in self.nodes_to_remove:
-                    node_tree.nodes.remove(node)
-
+            if len(AV_RemoveViewer.__get_viewers_to_remove()) <= 1:
+                self.__remove_data(node_tree)
                 return {'FINISHED'}
 
+            # There is nothing to process
             if len(AV_RemoveViewer.nodes_to_remove) == 0 and \
-                    len(AV_RemoveViewer.links_to_remove) == 0:
+                len(AV_RemoveViewer.links_to_remove) == 0 and \
+                len(AV_RemoveViewer.reconnections) == 0:
                 return {'FINISHED'}
 
             return context.window_manager.invoke_props_dialog(self)
@@ -674,6 +699,12 @@ class AV_RemoveViewer(GeoNodesEditorOnlyMixin, bpy.types.Operator):
     def execute(self, context: bpy.types.Context):
         space: bpy.types.SpaceNodeEditor = context.space_data
         node_tree = space.node_tree
+        self.__remove_data(node_tree)
+        return {'FINISHED'}
+
+    def __remove_data(self, node_tree: bpy.types.NodeTree):
+        for from_socket, to_socket in AV_RemoveViewer.reconnections:
+            node_tree.links.new(from_socket, to_socket)
 
         for link in AV_RemoveViewer.links_to_remove:
             node_tree.links.remove(link)
@@ -681,7 +712,9 @@ class AV_RemoveViewer(GeoNodesEditorOnlyMixin, bpy.types.Operator):
         for node in AV_RemoveViewer.nodes_to_remove:
             node_tree.nodes.remove(node)
 
-        return {'FINISHED'}
+    @classmethod
+    def __get_viewers_to_remove(cls) -> typing.List[bpy.types.Node]:
+        return [n for n in cls.nodes_to_remove if is_viewer_node(n)]
 
 
 class AV_AddViewer(GeoNodesEditorOnlyMixin, bpy.types.Operator):
