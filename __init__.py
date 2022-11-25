@@ -609,8 +609,8 @@ class AV_RemoveViewer(GeoNodesEditorOnlyMixin, bpy.types.Operator):
     bl_idname = "attribute_viewer.remove_viewer"
     bl_label = "Remove Attribute Viewer"
 
-    nodes_to_remove = []
-    links_to_remove = []
+    nodes_to_remove = set()
+    links_to_remove = set()
 
     def draw(self, context: bpy.types.Context):
         layout = self.layout
@@ -632,11 +632,11 @@ class AV_RemoveViewer(GeoNodesEditorOnlyMixin, bpy.types.Operator):
                 if is_socket_connected_to_viewer(node_tree, socket, check_geometry_socket=True):
                     viewer_connected_sockets.add(socket)
 
-            jg_nodes: typing.Dict[bpy.types.Node, typing.List[bpy.types.NodeLink]] = {}
+            jg_nodes: typing.Dict[bpy.types.Node, typing.Set[bpy.types.NodeLink]] = {}
             for link in node_tree.links:
                 if link.from_socket in viewer_connected_sockets and is_viewer_node(link.to_node):
-                    self.nodes_to_remove.append(link.to_node)
-                    self.links_to_remove.append(link)
+                    AV_RemoveViewer.nodes_to_remove.add(link.to_node)
+                    AV_RemoveViewer.links_to_remove.add(link)
 
                 # Remove join geometry node that's connected only to viewers
                 if isinstance(link.to_node, bpy.types.GeometryNodeJoinGeometry) and \
@@ -649,8 +649,8 @@ class AV_RemoveViewer(GeoNodesEditorOnlyMixin, bpy.types.Operator):
 
             for jg_node, links in jg_nodes.items():
                 if all([is_viewer_node(l.from_node) for l in links]):
-                    self.links_to_remove.extend(links)
-                    self.nodes_to_remove.append(jg_node)
+                    AV_RemoveViewer.links_to_remove.update(links)
+                    AV_RemoveViewer.nodes_to_remove.add(jg_node)
             
             # Don't invoke prompt if there is simple case that is obvious
             if len(AV_RemoveViewer.nodes_to_remove) <= 2 and \
