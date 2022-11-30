@@ -34,6 +34,7 @@ VIEWER_NAMES = {
     "AV_Integer-Value": bpy.types.NodeSocketInt,
     "AV_Vector-Value": bpy.types.NodeSocketVector,
     "AV_Vector": bpy.types.NodeSocketVector,
+    "AV_Bool-Value": bpy.types.NodeSocketBool,
     "AV_Color-Value": bpy.types.NodeSocketColor,
     "AV_Color": bpy.types.NodeSocketColor,
 }
