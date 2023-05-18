@@ -10,6 +10,7 @@
 
 import os
 import typing
+import itertools
 import math
 import bpy
 
@@ -30,13 +31,14 @@ GEONODES_PATH = os.path.join("data", "attribute_viewer_nodes.blend")
 # If there are more than one viewer for one type, then the default spawned one should be
 # selectable from preferences.
 VIEWER_NAMES = {
-    "AV_Float-Value": bpy.types.NodeSocketFloat,
-    "AV_Integer-Value": bpy.types.NodeSocketInt,
-    "AV_Vector-Value": bpy.types.NodeSocketVector,
-    "AV_Vector": bpy.types.NodeSocketVector,
-    "AV_Bool-Value": bpy.types.NodeSocketBool,
-    "AV_Color-Value": bpy.types.NodeSocketColor,
-    "AV_Color": bpy.types.NodeSocketColor,
+    "AV_Float-Value": (
+        bpy.types.NodeSocketFloat,
+        bpy.types.NodeSocketInt,
+        bpy.types.NodeSocketBool
+    ),
+    "AV_Vector-Value": (bpy.types.NodeSocketVector, bpy.types.NodeSocketColor),
+    "AV_Vector": (bpy.types.NodeSocketVector, bpy.types.NodeSocketColor),
+    "AV_Color": (bpy.types.NodeSocketColor, bpy.types.NodeSocketVector),
 }
 
 # How to scale text when it is spawned (so it looks somewhat good)
@@ -165,8 +167,8 @@ class Preferences(bpy.types.AddonPreferences):
 
     def get_default_viewer_enum_items(self, socket_type: typing.Type[bpy.types.NodeSocket]):
         ret = []
-        for name, viewer_type in VIEWER_NAMES.items():
-            if socket_type == viewer_type:
+        for name, viewer_types in VIEWER_NAMES.items():
+            if socket_type in viewer_types:
                 readable_name = get_readable_viewer_name(name)
                 ret.append((name, readable_name, readable_name))
 
@@ -181,8 +183,8 @@ class Preferences(bpy.types.AddonPreferences):
         elif socket_type == bpy.types.NodeSocketVector:
             return self.default_vector_viewer
         else:
-            for name, viewer_socket_type in VIEWER_NAMES.items():
-                if socket_type == viewer_socket_type:
+            for name, viewer_socket_types in VIEWER_NAMES.items():
+                if socket_type in viewer_socket_types:
                     return name
 
         raise ValueError(f"Unsupported socket type to view: {socket_type}")
@@ -298,7 +300,7 @@ def filter_applicable_sockets(
         if socket.hide or not socket.enabled:
             continue
 
-        if isinstance(socket, tuple(VIEWER_NAMES.values())):
+        if isinstance(socket, tuple(itertools.chain(VIEWER_NAMES.values()))):
             yield socket
 
 
@@ -343,8 +345,11 @@ def find_attribute_viewer_nodes_for_socket(
         if not isinstance(node, bpy.types.GeometryNodeGroup):
             continue
 
-        if hasattr(node, "node_tree") and searched_name in node.node_tree.name:
-            ret.append(node)
+        if hasattr(node, "node_tree"):
+            if searched_name in node.node_tree.name:
+                ret.append(node)
+            elif is_auto_viewer(node):
+                ret.append(node)
 
     return ret
 
@@ -402,8 +407,7 @@ def get_auto_attribute_viewer(
     # Connects 'socket' from 'node' in 'node_tree' to viewer node
     # and connects the viewer to output
     is_new = False
-    attribute_viewers = [
-        v for v in find_attribute_viewer_nodes_for_socket(node_tree, socket) if is_auto_viewer(v)]
+    attribute_viewers = find_attribute_viewer_nodes_for_socket(node_tree, socket)
     if not reuse_nodes or len(attribute_viewers) == 0:
         node_group = new_attribute_viewer_from_socket_type(node_tree, type(socket))
         is_new = True
@@ -534,7 +538,7 @@ class AV_ViewAttribute(GeoNodesEditorOnlyMixin, bpy.types.Operator):
             for node in list(node_tree.nodes):
                 if is_viewer_node(node) and \
                         is_auto_viewer(node) and \
-                        not isinstance(node.inputs[1], type(socket_to_view)):
+                        not isinstance(node.inputs["Attribute"], type(socket_to_view)):
                     node_tree.nodes.remove(node)
 
             socket_to_view = viewable_sockets[idx]
@@ -542,13 +546,10 @@ class AV_ViewAttribute(GeoNodesEditorOnlyMixin, bpy.types.Operator):
             mark_auto_viewer(attribute_viewer)
             if prev_geometry_socket:
                 node_tree.links.new(prev_geometry_socket, attribute_viewer.inputs[0])
-            node_tree.links.new(socket_to_view, attribute_viewer.inputs[1])
+            node_tree.links.new(socket_to_view, attribute_viewer.inputs["Attribute"])
 
             if prev_viewer and is_new:
                 attribute_viewer.location = prev_viewer.location
-                node_tree.nodes.remove(prev_viewer)
-            elif is_new:
-                attribute_viewer.location = (active_node.location.x + 400, active_node.location.y)
 
             # Connect attribute viewer to output
             output_node = None
