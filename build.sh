@@ -1,6 +1,6 @@
 #!/bin/bash
 
-VERSION="1.0.1"
+VERSION="2.0.0"
 BUILDS_FOLDER="builds"
 
 rm -rf ${BUILDS_FOLDER}/attribute_viewer
