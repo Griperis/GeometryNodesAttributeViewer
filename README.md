@@ -83,7 +83,7 @@ If you decided to use the addon version, you are able to use *Node Wrangler*-lik
 - `CTRL+SHIFT+W` - show addon menu, you can add viewers or remove all viewers from here
 
 <!-- TODO: Rebind controls -->
-### What people said
+### What people say
 
 > Immensely useful addon. Makes debugging node trees much much easier.
 
@@ -92,6 +92,9 @@ If you decided to use the addon version, you are able to use *Node Wrangler*-lik
 > ...
 ## Release Log
 
-- **2.0.0** *(TBD)* - updated attribute-number-text generator, attribute **domain support**, label **alignment**, **selection** input, simplified node setups
+- **2.0.0** *(10. 7. 2022)* - updated attribute-number-text generator, attribute **domain support**, label **alignment**, **selection** input, simplified node setups
 - **1.0.1** *(25. 11. 2022)*  - fixed error when other join geometry node was present
 - **1.0.0** *(18. 11. 2022)* - initial release supporting attribute viewing, number display node and addon code
+
+## License
+Addon is licensed under GNU GPL 3.0.
