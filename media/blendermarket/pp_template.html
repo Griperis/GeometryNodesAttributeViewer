@@ -1,0 +1,123 @@
+
+<!-- NOTE: Run through CSS inliner so it works on blendermarket -->
+<head>
+<style>
+.left {
+    float: left;
+}
+
+.right {
+    float: right;
+}
+.intro {
+    padding: 1rem; margin: 5px;
+}
+.gallery {
+    padding: 1.5rem; 
+    margin: 1.5rem 0.2rem;
+    border: 1px solid gray;
+    border-radius: 15px;
+    background-color: #f8f9fa;
+}
+
+.center {
+    text-align: center;
+}
+</style>
+</head>
+<div class="intro gallery">
+    <h1>Attribute Viewer</h1>
+    <p><i>Workflow improving nodes and addon.</i></p>
+    <blockquote class="blockquote">
+        Did you ever lack the possibility to see the spreadsheet values right in the 3D view?</blockquote>
+    <blockquote class="blockquote">
+        Did you wonder what the concrete values of fields are on their domain positions?</blockquote>
+    <blockquote class="blockquote">
+        What is the randomly generated value that you are plugging into other nodes?</blockquote>
+    <blockquote class="blockquote">
+        Or do you want to generate arbitrary numbers in geometry nodes?</blockquote>
+    <p>
+        This is all possible now by plugging one of the nodes of <b>Attribute Viewer</b>
+        into your node tree. We visualize the values by generating customizable text numbers at the place of your
+        attributes. The generated text can also be used in your renders, not only for debugging.
+    </p>
+    <div class="center">
+        <img src="view-vertex-group.gif">
+    </div>
+</div>
+<div class="gallery">
+    <div>
+        <h2>(NEW) Attribute Viewer 2.0</h3>
+        <p>The new update comes with exciting features and quality of life improvements</p>
+        <ul>
+            <li>Domain support - view fields stored at edges, faces, face corners or splines</li>
+            <li>Label alignment - align the labels to the selected object</li>
+            <li>Selection input - select where viewer labels are generated</li>
+            <li>Simplified system - four capable nodes for everything</li>
+        </ul>
+    </div>
+    <div style="text-align: center;">
+        <iframe width="80%" height="300px" src="https://www.youtube.com/embed/t2z5_7xMTJo"></iframe>
+    </div>
+</div>
+<div class="gallery">
+    <h2>Nodes</h2>
+    <div style="display: flex">
+        <div style="padding-right: 20px;">
+            <p>Four node groups to view your geometry nodes attributes. Node groups have similar inputs and output the original geometry + text representing the values in viewport.<p>
+            <p>Plug in the geometry, desired attribute and you are ready to go. You can also change the look of the generated text - scale, color, and offset are controllable</p>
+            <p>If you prefer more decimal numbers or working in a different number system, the node-groups support that too</p>
+        </div>
+        <div style="padding-right: 10px;">
+            <img src="nodes.png">
+        </div>
+    </div>
+</div>
+<div class="gallery">
+    <h2>Addon</h2>
+    <p>Similar workflow to the native viewer, but with viewer nodes. Install the addon version for
+    it to spawn nodes for you within a few clicks.</p>
+    <div style="text-align: center">
+        <img src="usability-cropped.gif">
+    </div>
+    <h3>Controls</h3>
+    <ul style="list-style-type: square; padding: 0px 0px 0px 1.5rem;">
+        <li><b>CTRL+SHIFT+Middle Mouse</b> <i>(on a node with attributes)</i> - cycle through attributes and
+            view them (or connect geometry to the active viewer)<br></li>
+        <li><b>CTRL+SHIFT+Right Click</b> <i>(on a node connected to viewer)</i> - remove connected viewers from
+            active node<br></li>
+        <li><b>CTRL+SHIFT+W</b> - show addon menu, you can add viewers or remove all viewers from here</li>
+    </ul>
+</div>
+<div style="padding: 1rem 0; border-top: 2px solid rgba(0,0,0,.2);">
+    <h3>Known Limitations</h3>
+    <p>This can be read as what is going to improve in the future if somebody wants it :)</p>
+    <ul style="list-style-type: square; padding: 0px 0px 0px 1.5rem;">
+        <li> Automatic viewing of attributes inside node groups is not supported. The viewer will always be spawned
+            in the root node tree.</li>
+        <li> Viewer node groups can generate a lot of instances, so conservative usage is recommended.</li>
+    </ul>
+</div>
+<div style="padding: 1rem 0; border-top: 2px solid rgba(0,0,0,.2);">
+    <h4>Changelog</h4>
+    <ul style="list-style-type: square; padding: 0px 0px 0px 1.5rem;">
+        <li><span style="font-weight: var(--base-text-weight-semibold, 600);">2.0.0 </span><em>(10. 7.
+                2023)</em> - updated attribute-number-text generator, attribute <span
+                style="font-weight: var(--base-text-weight-semibold, 600);">domain support</span>, label <span
+                style="font-weight: var(--base-text-weight-semibold, 600);">alignment</span>, <span
+                style="font-weight: var(--base-text-weight-semibold, 600);">selection</span> input, simplified
+            node-setups</li>
+        <li style="margin-top: 0.25em;"><span
+                style="font-weight: var(--base-text-weight-semibold, 600);">1.0.1 </span><em>(25. 11.
+                2022)</em> - fixed error when other join geometry node was present</li>
+        <li style="margin-top: 0.25em;"><span
+                style="font-weight: var(--base-text-weight-semibold, 600);">1.0.0 </span><em>(18. 11.
+                2022)</em> - initial release supporting attribute viewing, number display node, and addon code
+        </li>
+    </ul>
+    <p><i>Also available for an arbitrary price (free) on <a
+                href="https://griperis.gumroad.com/l/attribute-viewer">Gumroad</a> or <a
+                href="https://github.com/Griperis/GeometryNodesAttributeViewer">Github</a></i>!<br></p>
+</div>
+    <div>If you have any feedback, critique or an idea feel free to contact me through BlenderMarket or Github.</div>
+</div>
