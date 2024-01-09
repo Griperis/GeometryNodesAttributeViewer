@@ -18,7 +18,7 @@ bl_info = {
     "name": "Attribute Viewer",
     "author": "Zdenek Dolezal",
     "version": (1, 0, 0),
-    "blender": (3, 2, 0),
+    "blender": (3, 6, 0),
     "location": "View category under 'Add Nodes' menu or Ctrl-Shift-W",
     "description": "",
     "category": "Node",
