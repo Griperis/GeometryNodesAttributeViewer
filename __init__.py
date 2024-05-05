@@ -278,11 +278,7 @@ def get_preferences(context: typing.Optional[bpy.types.Context] = None) -> Prefe
 
 
 def get_geonodes_path() -> str:
-    return os.path.abspath(os.path.join(
-        bpy.utils.user_resource('SCRIPTS', path="addons"),
-        __package__,
-        GEONODES_PATH
-    ))
+    return os.path.abspath(os.path.join(__file__, "..", GEONODES_PATH))
 
 
 def ensure_viewer_nodes_loaded(link: bool = True):
